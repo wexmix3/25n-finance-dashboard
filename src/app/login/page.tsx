@@ -5,9 +5,11 @@ import { createBrowserSupabaseClient } from "@/lib/supabase/browser";
 import { useRouter } from "next/navigation";
 
 export default function LoginPage() {
+  const [mode, setMode] = useState<"signin" | "signup">("signin");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
+  const [message, setMessage] = useState("");
   const [loading, setLoading] = useState(false);
   const router = useRouter();
 
@@ -15,10 +17,23 @@ export default function LoginPage() {
     e.preventDefault();
     setLoading(true);
     setError("");
+    setMessage("");
 
     const supabase = createBrowserSupabaseClient();
-    const { error } = await supabase.auth.signInWithPassword({ email, password });
 
+    if (mode === "signup") {
+      const { error } = await supabase.auth.signUp({ email, password });
+      if (error) {
+        setError(error.message);
+      } else {
+        setMessage("Account created. You can now sign in.");
+        setMode("signin");
+      }
+      setLoading(false);
+      return;
+    }
+
+    const { error } = await supabase.auth.signInWithPassword({ email, password });
     if (error) {
       setError("Invalid email or password.");
       setLoading(false);
@@ -65,23 +80,40 @@ export default function LoginPage() {
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 required
-                autoComplete="current-password"
+                autoComplete={mode === "signup" ? "new-password" : "current-password"}
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
               />
             </div>
 
-            {error && (
-              <p className="text-sm text-red-600">{error}</p>
-            )}
+            {error && <p className="text-sm text-red-600">{error}</p>}
+            {message && <p className="text-sm text-emerald-600">{message}</p>}
 
             <button
               type="submit"
               disabled={loading}
               className="w-full py-2 px-4 bg-gray-900 text-white text-sm font-medium rounded-lg hover:bg-gray-800 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
             >
-              {loading ? "Signing in..." : "Sign in"}
+              {loading
+                ? mode === "signup" ? "Creating account..." : "Signing in..."
+                : mode === "signup" ? "Create account" : "Sign in"}
             </button>
           </form>
+
+          <p className="mt-4 text-center text-xs text-gray-400">
+            {mode === "signin" ? (
+              <>No account?{" "}
+                <button onClick={() => { setMode("signup"); setError(""); setMessage(""); }} className="text-gray-700 underline">
+                  Create one
+                </button>
+              </>
+            ) : (
+              <>Already have an account?{" "}
+                <button onClick={() => { setMode("signin"); setError(""); setMessage(""); }} className="text-gray-700 underline">
+                  Sign in
+                </button>
+              </>
+            )}
+          </p>
         </div>
       </div>
     </div>
