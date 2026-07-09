@@ -2,28 +2,105 @@
 
 import { LOCATIONS, Location } from "@/types/dashboard";
 
+export type LocationTab = Location | "Consolidated";
+
+type HealthStatus = "green" | "yellow" | "red";
+
 interface Props {
-  active: Location;
-  onChange: (loc: Location) => void;
+  active: LocationTab;
+  onChange: (loc: LocationTab) => void;
+  flagCounts?: Partial<Record<Location, number>>;
+  healthStatuses?: Partial<Record<Location, HealthStatus>>;
+  syncPeriod?: boolean;
+  onSyncToggle?: () => void;
 }
 
-export function LocationTabs({ active, onChange }: Props) {
+export function LocationTabs({ active, onChange, flagCounts, healthStatuses, syncPeriod, onSyncToggle }: Props) {
+  const hasHealth = LOCATIONS.some(l => healthStatuses?.[l]);
   return (
-    <div className="flex items-center gap-1 border-b border-gray-200">
-      {LOCATIONS.map((loc) => (
-        <button
-          key={loc}
-          onClick={() => onChange(loc)}
-          className={[
-            "px-4 py-3 text-sm font-medium border-b-2 -mb-px transition-colors",
-            active === loc
-              ? "border-gray-900 text-gray-900"
-              : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300",
-          ].join(" ")}
-        >
-          {loc}
-        </button>
-      ))}
+    <div className="rounded-lg border border-gray-200 bg-white px-1 pt-1">
+      <div className="flex items-center justify-between gap-2">
+        <div className="flex items-center gap-1 overflow-x-auto scrollbar-none flex-1 min-w-0">
+      {/* Consolidated — all locations, no single period assumed */}
+      <button
+        onClick={() => onChange("Consolidated")}
+        className={[
+          "flex items-center gap-1.5 px-4 py-3 text-sm font-semibold border-b-2 -mb-px transition-colors duration-150 cursor-pointer whitespace-nowrap",
+          active === "Consolidated"
+            ? "border-[#E07A3E] text-[#E07A3E] bg-[#fdf2e9]/60 rounded-t"
+            : "border-transparent text-gray-500 hover:text-gray-800 hover:border-gray-300",
+        ].join(" ")}
+      >
+        Consolidated
+      </button>
+      <span className="w-px h-6 bg-gray-200 flex-shrink-0 mx-0.5" aria-hidden />
+      {LOCATIONS.map((loc) => {
+        const flags = flagCounts?.[loc] ?? 0;
+        const health = healthStatuses?.[loc];
+        return (
+          <button
+            key={loc}
+            onClick={() => onChange(loc)}
+            className={[
+              "flex items-center gap-1.5 px-4 py-3 text-sm font-semibold border-b-2 -mb-px transition-colors duration-150 cursor-pointer",
+              active === loc
+                ? "border-[#E07A3E] text-[#E07A3E]"
+                : "border-transparent text-gray-500 hover:text-gray-800 hover:border-gray-300",
+            ].join(" ")}
+          >
+            {health && (
+              <span
+                title={`NOI vs budget: ${health === "green" ? "on track (within 10%)" : health === "yellow" ? "at risk (10–25% miss)" : "off track (>25% miss)"}`}
+                className={`w-2 h-2 rounded-full flex-shrink-0 ${
+                  health === "green" ? "bg-emerald-500" :
+                  health === "yellow" ? "bg-amber-400" : "bg-red-500"
+                }`}
+              />
+            )}
+            {loc}
+            {flags > 0 && (
+              <span className="inline-flex items-center justify-center min-w-[16px] h-4 px-1 text-[10px] font-bold rounded-full bg-red-500 text-white leading-none">
+                {flags}
+              </span>
+            )}
+          </button>
+        );
+      })}
+        </div>
+        {/* Health legend + period sync — inline right */}
+        <div className="flex items-center gap-3 flex-shrink-0 pb-px pr-1">
+          {hasHealth && (
+            <div className="hidden sm:flex items-center gap-2 border border-gray-200 rounded px-2 py-1">
+              <span className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider pr-1 border-r border-gray-200">NOI</span>
+              <div className="flex items-center gap-1 text-[11px] text-gray-500">
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 inline-block flex-shrink-0" />On pace
+              </div>
+              <div className="flex items-center gap-1 text-[11px] text-gray-500">
+                <span className="w-1.5 h-1.5 rounded-full bg-amber-400 inline-block flex-shrink-0" />At risk
+              </div>
+              <div className="flex items-center gap-1 text-[11px] text-gray-500">
+                <span className="w-1.5 h-1.5 rounded-full bg-red-500 inline-block flex-shrink-0" />Off track
+              </div>
+            </div>
+          )}
+          {onSyncToggle && (
+            <button
+              onClick={onSyncToggle}
+              title={syncPeriod
+                ? "All tabs locked to the same period — click to allow each tab its own period"
+                : "Lock all location tabs to the same period so you can compare the same month across locations"}
+              className={[
+                "text-[11px] font-medium px-2.5 py-0.5 rounded border transition-colors duration-150 cursor-pointer whitespace-nowrap",
+                syncPeriod
+                  ? "border-[#E07A3E]/40 bg-[#fdf2e9] text-[#E07A3E]"
+                  : "border-gray-200 text-gray-400 hover:text-gray-600 hover:border-gray-300",
+              ].join(" ")}
+            >
+              {syncPeriod ? "Unlock periods" : "Compare periods"}
+            </button>
+          )}
+        </div>
+      </div>
     </div>
   );
 }

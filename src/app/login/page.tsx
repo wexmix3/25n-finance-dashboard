@@ -22,9 +22,12 @@ export default function LoginPage() {
     const supabase = createBrowserSupabaseClient();
 
     if (mode === "signup") {
-      const { error } = await supabase.auth.signUp({ email, password });
+      const { data, error } = await supabase.auth.signUp({ email, password });
       if (error) {
-        setError(error.message);
+        setError(error.message || error.name || `Sign up failed (${JSON.stringify(error)})`);
+      } else if (data.user && !data.session) {
+        setMessage("Check your email to confirm your account, then sign in.");
+        setMode("signin");
       } else {
         setMessage("Account created. You can now sign in.");
         setMode("signin");
@@ -35,7 +38,7 @@ export default function LoginPage() {
 
     const { error } = await supabase.auth.signInWithPassword({ email, password });
     if (error) {
-      setError("Invalid email or password.");
+      setError(error.message || "Invalid email or password.");
       setLoading(false);
       return;
     }
@@ -48,8 +51,12 @@ export default function LoginPage() {
     <div className="min-h-screen flex items-center justify-center bg-gray-50">
       <div className="w-full max-w-sm">
         <div className="text-center mb-8">
-          <h1 className="text-2xl font-semibold text-gray-900">25N Coworking</h1>
-          <p className="text-sm text-gray-500 mt-1">Financial Dashboard</p>
+          <div className="flex items-center justify-center gap-2 mb-2">
+            <span className="text-3xl font-extrabold tracking-tight text-[#E07A3E]">25N</span>
+            <span className="text-lg font-light text-gray-300">|</span>
+            <span className="text-sm font-semibold tracking-widest text-gray-400 uppercase">Coworking</span>
+          </div>
+          <p className="text-sm text-gray-400 tracking-wide uppercase">Financial Dashboard</p>
         </div>
 
         <div className="bg-white rounded-xl border border-gray-200 p-8 shadow-sm">
@@ -65,7 +72,7 @@ export default function LoginPage() {
                 onChange={(e) => setEmail(e.target.value)}
                 required
                 autoComplete="email"
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#E07A3E] focus:border-transparent"
                 placeholder="you@25ncoworking.com"
               />
             </div>
@@ -81,7 +88,7 @@ export default function LoginPage() {
                 onChange={(e) => setPassword(e.target.value)}
                 required
                 autoComplete={mode === "signup" ? "new-password" : "current-password"}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#E07A3E] focus:border-transparent"
               />
             </div>
 
@@ -91,7 +98,7 @@ export default function LoginPage() {
             <button
               type="submit"
               disabled={loading}
-              className="w-full py-2 px-4 bg-gray-900 text-white text-sm font-medium rounded-lg hover:bg-gray-800 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+              className="w-full py-2 px-4 bg-[#E07A3E] text-white text-sm font-semibold rounded-lg hover:bg-[#c5692f] disabled:opacity-50 disabled:cursor-not-allowed transition-colors duration-150"
             >
               {loading
                 ? mode === "signup" ? "Creating account..." : "Signing in..."

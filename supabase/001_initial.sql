@@ -11,10 +11,12 @@ CREATE TABLE IF NOT EXISTS profiles (
 CREATE OR REPLACE FUNCTION handle_new_user()
 RETURNS trigger AS $$
 BEGIN
-  INSERT INTO profiles (id, role) VALUES (new.id, 'viewer');
+  INSERT INTO public.profiles (id, role)
+  VALUES (new.id, 'viewer')
+  ON CONFLICT (id) DO NOTHING;
   RETURN new;
 END;
-$$ LANGUAGE plpgsql SECURITY DEFINER;
+$$ LANGUAGE plpgsql SECURITY DEFINER SET search_path = public;
 
 DROP TRIGGER IF EXISTS on_auth_user_created ON auth.users;
 CREATE TRIGGER on_auth_user_created
@@ -48,12 +50,15 @@ ALTER TABLE monthly_financials ENABLE ROW LEVEL SECURITY;
 ALTER TABLE monthly_occupancy ENABLE ROW LEVEL SECURITY;
 ALTER TABLE profiles ENABLE ROW LEVEL SECURITY;
 
+DROP POLICY IF EXISTS "authenticated users can read financials" ON monthly_financials;
 CREATE POLICY "authenticated users can read financials"
   ON monthly_financials FOR SELECT TO authenticated USING (true);
 
+DROP POLICY IF EXISTS "authenticated users can read occupancy" ON monthly_occupancy;
 CREATE POLICY "authenticated users can read occupancy"
   ON monthly_occupancy FOR SELECT TO authenticated USING (true);
 
+DROP POLICY IF EXISTS "users can read own profile" ON profiles;
 CREATE POLICY "users can read own profile"
   ON profiles FOR SELECT TO authenticated USING (auth.uid() = id);
 
