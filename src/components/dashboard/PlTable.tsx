@@ -100,12 +100,13 @@ function SectionHeader({ label, showRevPct, budgetLabel }: { label: string; show
 }
 
 function SubtotalRow({ label, actual, budget, prior, isExpense, borderStrength = "single", showRevPct, totalRev = 0, acctStyle = true, pacingFactor = 1 }: {
-  label: string; actual: number; budget: number; prior?: number; isExpense?: boolean; borderStrength?: "single" | "double";
+  label: string; actual: number; budget: number | null; prior?: number; isExpense?: boolean; borderStrength?: "single" | "double";
   showRevPct?: boolean; totalRev?: number; acctStyle?: boolean; pacingFactor?: number;
 }) {
-  const effectiveBudget = budget * pacingFactor;
-  const variance = actual - effectiveBudget;
-  const varFavorable = isExpense ? variance <= 0 : variance >= 0;
+  const hasBudget = budget !== null;
+  const effectiveBudget = hasBudget ? budget * pacingFactor : null;
+  const variance = hasBudget ? actual - effectiveBudget! : null;
+  const varFavorable = variance !== null && (isExpense ? variance <= 0 : variance >= 0);
   const isKeyLine = borderStrength === "double";
   const borderClass = isKeyLine ? "border-b-2 border-gray-300" : "border-b border-gray-200";
   const bgClass = isKeyLine ? "bg-gray-50 rounded" : "bg-gray-50/50";
@@ -117,13 +118,13 @@ function SubtotalRow({ label, actual, budget, prior, isExpense, borderStrength =
       <span className={`text-right tabular-nums ${actual < 0 ? "text-red-600" : "text-emerald-600"}`}>
         {fmtDollar(actual, acctStyle)}
       </span>
-      <span className={`text-right tabular-nums ${effectiveBudget < 0 ? "text-red-400" : "text-gray-400"}`}>
-        {fmtDollar(effectiveBudget, acctStyle)}
+      <span className={`text-right tabular-nums ${effectiveBudget !== null && effectiveBudget < 0 ? "text-red-400" : "text-gray-400"}`}>
+        {effectiveBudget !== null ? fmtDollar(effectiveBudget, acctStyle) : ""}
       </span>
       <span className={`text-right tabular-nums font-medium text-xs ${
-        variance === 0 ? "text-gray-300" : varFavorable ? "text-emerald-600" : "text-red-500"
+        variance === null || variance === 0 ? "text-gray-300" : varFavorable ? "text-emerald-600" : "text-red-500"
       }`}>
-        {fmtVariance(variance, acctStyle)}
+        {variance !== null ? fmtVariance(variance, acctStyle) : ""}
       </span>
       <span className="text-right tabular-nums text-gray-400">
         {prior !== undefined ? fmtDollar(prior, acctStyle) : ""}
@@ -278,7 +279,7 @@ export function PlTable({ current, prior, pacingPct }: Props) {
       <SubtotalRow
         label="Net Income"
         actual={is.net_income.actual}
-        budget={0}
+        budget={null}
         prior={pi?.net_income.actual}
         borderStrength="double"
         showRevPct={showRevPct}

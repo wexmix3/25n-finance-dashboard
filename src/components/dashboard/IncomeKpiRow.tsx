@@ -82,12 +82,18 @@ export function IncomeKpiRow({ current, prior, runRateFactor, pacingPct }: Props
   const proratedRevBudget = budgetRev * effectivePacing;
   const proratedNoiBudget = budgetNoi * effectivePacing;
 
-  const vsBudgetRev = proratedRevBudget
+  // Below this budget magnitude, a % variance explodes into noise (e.g. a $777
+  // miss on a $63 budget reads as +1200%) — show the absolute dollar miss
+  // instead once the denominator gets too small to carry a meaningful ratio.
+  const PCT_DENOMINATOR_FLOOR = 2000;
+  const vsBudgetRev = Math.abs(proratedRevBudget) >= PCT_DENOMINATOR_FLOOR
     ? ((rev - proratedRevBudget) / Math.abs(proratedRevBudget)) * 100
     : null;
-  const vsBudgetNoi = proratedNoiBudget
+  const vsBudgetNoi = Math.abs(proratedNoiBudget) >= PCT_DENOMINATOR_FLOOR
     ? ((noi - proratedNoiBudget) / Math.abs(proratedNoiBudget)) * 100
     : null;
+  const noiMissTooSmallForPct = Math.abs(proratedNoiBudget) < PCT_DENOMINATOR_FLOOR && proratedNoiBudget !== 0;
+  const revMissTooSmallForPct = Math.abs(proratedRevBudget) < PCT_DENOMINATOR_FLOOR && proratedRevBudget !== 0;
 
   // Revenue run-rate only — OPEX is fixed-cost so NOI projection math is invalid
   const projRev = runRateFactor ? `→ ${fmt(rev * runRateFactor)} est. full-mo.` : undefined;
@@ -127,18 +133,30 @@ export function IncomeKpiRow({ current, prior, runRateFactor, pacingPct }: Props
       />
       <KpiCard
         label="Revenue vs Budget"
-        value={vsBudgetRev !== null ? `${vsBudgetRev >= 0 ? "+" : ""}${vsBudgetRev.toFixed(1)}%` : "—"}
-        sub={budgetNote}
-        subPositive={vsBudgetRev !== null && vsBudgetRev >= 0}
+        value={
+          vsBudgetRev !== null
+            ? `${vsBudgetRev >= 0 ? "+" : ""}${vsBudgetRev.toFixed(1)}%`
+            : revMissTooSmallForPct
+            ? fmt(rev - proratedRevBudget)
+            : "—"
+        }
+        sub={revMissTooSmallForPct ? "budget too small for a % — showing $ miss" : budgetNote}
+        subPositive={vsBudgetRev !== null ? vsBudgetRev >= 0 : revMissTooSmallForPct ? rev >= proratedRevBudget : undefined}
         highlight
-        info={{ title: "Revenue vs Budget", formula: isPartial ? `(MTD Revenue − Budget × ${Math.round(effectivePacing * 100)}%) ÷ |Prorated Budget|` : "(Revenue − Full-Month Budget) ÷ |Budget|", source: "Budget from Yardi Budget Comparison export", note: isPartial ? "Budget is prorated to match elapsed days so Day-8 actuals aren't compared to a full-month target." : undefined }}
+        info={{ title: "Revenue vs Budget", formula: isPartial ? `(MTD Revenue − Budget × ${Math.round(effectivePacing * 100)}%) ÷ |Prorated Budget|` : "(Revenue − Full-Month Budget) ÷ |Budget|", source: "Budget from Yardi Budget Comparison export", note: `${isPartial ? "Budget is prorated to match elapsed days so Day-8 actuals aren't compared to a full-month target. " : ""}Below a $${PCT_DENOMINATOR_FLOOR.toLocaleString()} budget, the % swings wildly, so the $ miss is shown instead.` }}
       />
       <KpiCard
         label="NOI vs Budget"
-        value={vsBudgetNoi !== null ? `${vsBudgetNoi >= 0 ? "+" : ""}${vsBudgetNoi.toFixed(1)}%` : "—"}
-        sub={budgetNote}
-        subPositive={vsBudgetNoi !== null && vsBudgetNoi >= 0}
-        info={{ title: "NOI vs Budget", formula: isPartial ? `(MTD NOI − NOI Budget × ${Math.round(effectivePacing * 100)}%) ÷ |Prorated NOI Budget|` : "(NOI − Full-Month NOI Budget) ÷ |NOI Budget|", source: "NOI budget from Yardi Budget Comparison export", note: "Key signal for whether the location is on track for its profitability target." }}
+        value={
+          vsBudgetNoi !== null
+            ? `${vsBudgetNoi >= 0 ? "+" : ""}${vsBudgetNoi.toFixed(1)}%`
+            : noiMissTooSmallForPct
+            ? fmt(noi - proratedNoiBudget)
+            : "—"
+        }
+        sub={noiMissTooSmallForPct ? "budget too small for a % — showing $ miss" : budgetNote}
+        subPositive={vsBudgetNoi !== null ? vsBudgetNoi >= 0 : noiMissTooSmallForPct ? noi >= proratedNoiBudget : undefined}
+        info={{ title: "NOI vs Budget", formula: isPartial ? `(MTD NOI − NOI Budget × ${Math.round(effectivePacing * 100)}%) ÷ |Prorated NOI Budget|` : "(NOI − Full-Month NOI Budget) ÷ |NOI Budget|", source: "NOI budget from Yardi Budget Comparison export", note: `Key signal for whether the location is on track for its profitability target. Below a $${PCT_DENOMINATOR_FLOOR.toLocaleString()} budget, the % swings wildly (a small-dollar miss reads as +1000%+), so the $ miss is shown instead.` }}
       />
     </div>
   );
