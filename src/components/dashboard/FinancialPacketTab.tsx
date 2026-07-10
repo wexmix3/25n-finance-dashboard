@@ -81,14 +81,19 @@ function PlaceholderSection({ title, reason }: { title: string; reason: string }
   );
 }
 
-function AgingTable({ label, totals, showCurrent = true }: { label: string; totals: Record<string, number>; showCurrent?: boolean }) {
+function AgingTable({ label, totals }: { label: string; totals: Record<string, number> }) {
+  // "Current" is excluded from both tables — it isn't an independent bucket,
+  // Yardi always mirrors it into whichever real bucket (0-30/31-60/etc.)
+  // currently holds the balance (same non-additive behavior fixed in
+  // parse_ar_aging.py / parse_ap_aging.py's own total_owed calc), so it adds
+  // no new information and previously made AR (5 rows) and AP (4 rows) not
+  // line up when shown side by side.
   const buckets = [
-    { key: "current", label: "Current" },
     { key: "d0_30", label: "0–30 days" },
     { key: "d31_60", label: "31–60 days" },
     { key: "d61_90", label: "61–90 days" },
     { key: "over_90", label: "Over 90" },
-  ].filter(b => showCurrent || b.key !== "current");
+  ];
   return (
     <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
       <div className="px-5 py-4 border-b border-gray-200">
@@ -353,7 +358,6 @@ export function FinancialPacketTab({ currentData, packet }: Props) {
           <AgingTable
             label="AP Aging"
             totals={packetData.ap_aging.totals as unknown as Record<string, number>}
-            showCurrent={false}
           />
         ) : (
           <PlaceholderSection title="AP Aging" reason="Not yet uploaded" />
