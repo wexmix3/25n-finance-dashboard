@@ -6,6 +6,7 @@ import { createBrowserSupabaseClient } from "@/lib/supabase/browser";
 import { LOCATIONS, Location } from "@/types/dashboard";
 import type { MonthlyRecord, TrendPoint, FinancialData, OccupancyData, MonthlyPacket } from "@/types/dashboard";
 import { LocationTabs, LocationTab } from "@/components/dashboard/LocationTabs";
+import { PeriodPills } from "@/components/dashboard/PeriodPills";
 import { PeriodBanner } from "@/components/dashboard/PeriodBanner";
 import { IncomeKpiRow } from "@/components/dashboard/IncomeKpiRow";
 import { InsightsPanel } from "@/components/dashboard/InsightsPanel";
@@ -84,6 +85,9 @@ export function DashboardClient({ locationData, packetData, userEmail, role }: P
   // per-location month pills (which stay independent per tab).
   const [consolidatedMonth, setConsolidatedMonth] = useState<string | null>(null);
   const [activeView, setActiveView] = useState<"overview" | "packet" | "gl" | "occupancy">("overview");
+  // Instant local override for "mark reviewed" so badges clear immediately
+  // without waiting on a full server refetch. Keyed by "location|month".
+  const [reviewOverrides, setReviewOverrides] = useState<Record<string, boolean>>({});
   const router = useRouter();
 
   const locData = locationData[activeLocation];
@@ -138,9 +142,12 @@ export function DashboardClient({ locationData, packetData, userEmail, role }: P
   const healthStatuses: Partial<Record<Location, HealthStatus>> = {};
 
   for (const loc of LOCATIONS) {
-    const d = locationData[loc].current?.data;
+    const rec = locationData[loc].current;
+    const d = rec?.data;
+    const reviewKey = rec ? `${loc}|${rec.month}` : "";
+    const isReviewed = reviewOverrides[reviewKey] ?? rec?.gl_reviewed ?? false;
     const totalIssues = (d?.variance_flags?.length ?? 0) + (d?.control_violations?.length ?? 0) + (d?.journal_entry_accounts?.length ?? 0);
-    if (totalIssues > 0) {
+    if (totalIssues > 0 && !isReviewed) {
       flagCounts[loc] = totalIssues;
     }
     const noi = d?.income_statement?.net_operating_income;
@@ -222,36 +229,12 @@ export function DashboardClient({ locationData, packetData, userEmail, role }: P
                   {consolidatedMonth ? `${consolidatedMonth} — same period across all locations` : "Most recent closed period per location"}
                 </p>
               </div>
-              {consolidatedMonths.length > 1 && (() => {
-                const MONTH_IDX = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
-                const parseM = (m: string) => { const [mon, yr] = m.split(" "); return parseInt(yr) * 12 + MONTH_IDX.indexOf(mon); };
-                const sorted = [...consolidatedMonths].sort((a, b) => parseM(b) - parseM(a));
-                return (
-                  <div className="flex items-center gap-1 overflow-x-auto scrollbar-none flex-nowrap">
-                    <button
-                      onClick={() => setConsolidatedMonth(null)}
-                      className={[
-                        "px-2.5 py-1 rounded text-xs font-medium transition-colors duration-150 cursor-pointer flex-shrink-0",
-                        consolidatedMonth === null ? "bg-[#E07A3E] text-white" : "bg-gray-100 text-gray-500 hover:bg-gray-200",
-                      ].join(" ")}
-                    >
-                      Latest
-                    </button>
-                    {sorted.map((month) => (
-                      <button
-                        key={month}
-                        onClick={() => setConsolidatedMonth(month)}
-                        className={[
-                          "px-2.5 py-1 rounded text-xs font-medium transition-colors duration-150 cursor-pointer flex-shrink-0",
-                          consolidatedMonth === month ? "bg-[#E07A3E] text-white" : "bg-gray-100 text-gray-500 hover:bg-gray-200",
-                        ].join(" ")}
-                      >
-                        {month}
-                      </button>
-                    ))}
-                  </div>
-                );
-              })()}
+              <PeriodPills
+                months={consolidatedMonths}
+                active={consolidatedMonth}
+                onSelect={setConsolidatedMonth}
+                extraFirstPill={{ label: "Latest", selected: consolidatedMonth === null, onClick: () => setConsolidatedMonth(null) }}
+              />
             </div>
             <LocationSummaryTable
               locationData={Object.fromEntries(
@@ -266,33 +249,12 @@ export function DashboardClient({ locationData, packetData, userEmail, role }: P
         ) : (
         <>
 
-        {/* Month selector — sorted newest → oldest */}
-        {locData.availableMonths.length > 1 && (() => {
-          const MONTH_IDX = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
-          const parseM = (m: string) => { const [mon, yr] = m.split(" "); return parseInt(yr) * 12 + MONTH_IDX.indexOf(mon); };
-          const sortedMonths = [...locData.availableMonths].sort((a, b) => parseM(b) - parseM(a));
-          return (
-          <div className="flex items-center gap-2">
-            <span className="text-xs text-gray-400 font-medium uppercase tracking-wide flex-shrink-0">Period</span>
-            <div className="flex items-center gap-1 overflow-x-auto scrollbar-none flex-nowrap pb-0.5">
-              {sortedMonths.map((month) => (
-                <button
-                  key={month}
-                  onClick={() => handleMonthSelect(month)}
-                  className={[
-                    "px-2.5 py-1 rounded text-xs font-medium transition-colors duration-150 cursor-pointer flex-shrink-0",
-                    activeMonth === month
-                      ? "bg-[#E07A3E] text-white"
-                      : "bg-gray-100 text-gray-500 hover:bg-gray-200",
-                  ].join(" ")}
-                >
-                  {month}
-                </button>
-              ))}
-            </div>
-          </div>
-          );
-        })()}
+        {/* Month selector — January on the left through December on the right, grouped by year */}
+        <PeriodPills
+          months={locData.availableMonths}
+          active={activeMonth}
+          onSelect={handleMonthSelect}
+        />
 
         {/* View tabs: Overview | Financial Packet | GL Check | Occupancy */}
         <div className="flex items-center gap-1 border-b border-gray-200 pb-0">
@@ -318,7 +280,9 @@ export function DashboardClient({ locationData, packetData, userEmail, role }: P
                 {labels[view]}
                 {view === "gl" && (() => {
                   const glIssues = (currentData?.variance_flags?.length ?? 0) + (currentData?.control_violations?.length ?? 0) + (currentData?.journal_entry_accounts?.length ?? 0);
-                  return glIssues > 0 && (
+                  const reviewKey = current ? `${activeLocation}|${current.month}` : "";
+                  const isReviewed = reviewOverrides[reviewKey] ?? current?.gl_reviewed ?? false;
+                  return glIssues > 0 && !isReviewed && (
                     <span className="ml-1.5 inline-flex items-center justify-center w-4 h-4 rounded-full bg-red-100 text-red-700 text-[10px] font-bold">
                       {glIssues}
                     </span>
@@ -353,8 +317,18 @@ export function DashboardClient({ locationData, packetData, userEmail, role }: P
 
         {/* GL Check view */}
         {activeView === "gl" && (
-          currentData ? (
-            <GLCheckTab currentData={currentData} priorMonth={priorMonth} uploadedAt={current?.uploaded_at} />
+          currentData && current ? (
+            <GLCheckTab
+              currentData={currentData}
+              priorMonth={priorMonth}
+              uploadedAt={current?.uploaded_at}
+              reviewed={reviewOverrides[`${activeLocation}|${current.month}`] ?? current.gl_reviewed}
+              reviewedBy={current.gl_reviewed_by}
+              reviewedAt={current.gl_reviewed_at}
+              onReviewChange={(reviewed) =>
+                setReviewOverrides(prev => ({ ...prev, [`${activeLocation}|${current.month}`]: reviewed }))
+              }
+            />
           ) : (
             <div className="bg-white rounded-lg border border-gray-200 p-8 text-center">
               <p className="text-sm text-gray-400">No data for {activeLocation} — upload GL data first.</p>

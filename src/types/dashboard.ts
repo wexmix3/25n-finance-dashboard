@@ -126,6 +126,9 @@ export interface MonthlyRecord {
   data: FinancialData;
   uploaded_at: string;
   locked: boolean;
+  gl_reviewed?: boolean;
+  gl_reviewed_by?: string | null;
+  gl_reviewed_at?: string | null;
 }
 
 export interface OccupancySpaceType {
