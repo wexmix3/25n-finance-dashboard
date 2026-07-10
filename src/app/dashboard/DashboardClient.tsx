@@ -139,8 +139,9 @@ export function DashboardClient({ locationData, packetData, userEmail, role }: P
 
   for (const loc of LOCATIONS) {
     const d = locationData[loc].current?.data;
-    if (d?.variance_flags && d.variance_flags.length > 0) {
-      flagCounts[loc] = d.variance_flags.length;
+    const totalIssues = (d?.variance_flags?.length ?? 0) + (d?.control_violations?.length ?? 0) + (d?.journal_entry_accounts?.length ?? 0);
+    if (totalIssues > 0) {
+      flagCounts[loc] = totalIssues;
     }
     const noi = d?.income_statement?.net_operating_income;
     const c = locationData[loc].current;
@@ -315,11 +316,14 @@ export function DashboardClient({ locationData, packetData, userEmail, role }: P
                 ].join(" ")}
               >
                 {labels[view]}
-                {view === "gl" && (currentData?.variance_flags?.length ?? 0) > 0 && (
-                  <span className="ml-1.5 inline-flex items-center justify-center w-4 h-4 rounded-full bg-red-100 text-red-700 text-[10px] font-bold">
-                    {currentData!.variance_flags!.length}
-                  </span>
-                )}
+                {view === "gl" && (() => {
+                  const glIssues = (currentData?.variance_flags?.length ?? 0) + (currentData?.control_violations?.length ?? 0) + (currentData?.journal_entry_accounts?.length ?? 0);
+                  return glIssues > 0 && (
+                    <span className="ml-1.5 inline-flex items-center justify-center w-4 h-4 rounded-full bg-red-100 text-red-700 text-[10px] font-bold">
+                      {glIssues}
+                    </span>
+                  );
+                })()}
               </button>
             );
           })}

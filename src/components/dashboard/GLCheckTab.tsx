@@ -2,6 +2,8 @@
 
 import type { FinancialData } from "@/types/dashboard";
 import { GLVariancePanel } from "./GLVariancePanel";
+import { ControlViolationsPanel } from "./ControlViolationsPanel";
+import { JournalEntryPanel } from "./JournalEntryPanel";
 
 interface Props {
   currentData: FinancialData;
@@ -16,16 +18,18 @@ function fmtDate(iso?: string): string {
 
 export function GLCheckTab({ currentData, priorMonth, uploadedAt }: Props) {
   const flags = currentData.variance_flags ?? [];
+  const violations = currentData.control_violations ?? [];
+  const jeAccounts = currentData.journal_entry_accounts ?? [];
   const flagCount = flags.length;
+  const totalIssues = flagCount + violations.length + jeAccounts.length;
 
-  // Derive clean count from the ratio in flags vs total accounts (approximate)
   const statusColor =
-    flagCount === 0 ? "text-emerald-600 bg-emerald-50 border-emerald-200"
-    : flagCount <= 5 ? "text-amber-700 bg-amber-50 border-amber-200"
+    totalIssues === 0 ? "text-emerald-600 bg-emerald-50 border-emerald-200"
+    : totalIssues <= 5 ? "text-amber-700 bg-amber-50 border-amber-200"
     : "text-red-700 bg-red-50 border-red-200";
 
   const statusLabel =
-    flagCount === 0 ? "Clean" : `${flagCount} flag${flagCount !== 1 ? "s" : ""}`;
+    totalIssues === 0 ? "Clean" : `${totalIssues} item${totalIssues !== 1 ? "s" : ""} to review`;
 
   return (
     <div className="space-y-4">
@@ -42,23 +46,29 @@ export function GLCheckTab({ currentData, priorMonth, uploadedAt }: Props) {
         </span>
       </div>
 
-      {/* Stat chips */}
-      <div className="grid grid-cols-3 gap-3">
+      {/* Stat chips — three distinct checks, each answers a different question */}
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
         <div className="bg-white rounded-lg border border-gray-200 p-4 text-center">
-          <p className={`text-2xl font-bold ${flagCount === 0 ? "text-emerald-600" : "text-red-600"}`}>
+          <p className={`text-2xl font-bold ${flagCount === 0 ? "text-emerald-600" : "text-amber-600"}`}>
             {flagCount}
           </p>
           <p className="text-xs text-gray-400 mt-0.5">Variance Flags</p>
         </div>
         <div className="bg-white rounded-lg border border-gray-200 p-4 text-center">
-          <p className="text-2xl font-bold text-gray-700">
-            {flagCount === 0 ? "—" : priorMonth}
+          <p className={`text-2xl font-bold ${violations.length === 0 ? "text-emerald-600" : "text-red-600"}`}>
+            {violations.length}
           </p>
-          <p className="text-xs text-gray-400 mt-0.5">Compared Against</p>
+          <p className="text-xs text-gray-400 mt-0.5">Control # Issues</p>
+        </div>
+        <div className="bg-white rounded-lg border border-gray-200 p-4 text-center">
+          <p className={`text-2xl font-bold ${jeAccounts.length === 0 ? "text-emerald-600" : "text-amber-700"}`}>
+            {jeAccounts.length}
+          </p>
+          <p className="text-xs text-gray-400 mt-0.5">Needs JE Review</p>
         </div>
         <div className="bg-white rounded-lg border border-gray-200 p-4 text-center">
           <p className="text-2xl font-bold text-gray-700">{currentData.month}</p>
-          <p className="text-xs text-gray-400 mt-0.5">Current Period</p>
+          <p className="text-xs text-gray-400 mt-0.5">Current Period vs {priorMonth}</p>
         </div>
       </div>
 
@@ -72,8 +82,10 @@ export function GLCheckTab({ currentData, priorMonth, uploadedAt }: Props) {
         </div>
       )}
 
-      {/* Variance flags table */}
+      {/* Three checks, each answering a different question */}
       <GLVariancePanel flags={flags} priorMonth={priorMonth} />
+      <ControlViolationsPanel violations={violations} />
+      <JournalEntryPanel accounts={jeAccounts} />
 
       {/* Re-run instructions */}
       <div className="bg-gray-50 rounded-lg border border-gray-200 px-4 py-3">

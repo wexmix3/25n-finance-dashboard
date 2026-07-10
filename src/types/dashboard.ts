@@ -83,6 +83,23 @@ export interface VarianceFlag {
   equity_account?: boolean;
 }
 
+export interface ControlViolation {
+  account: string;
+  account_name: string;
+  control: string;
+  violation_type: string;
+  message: string;
+  amount: number;
+}
+
+export interface JournalEntryAccount {
+  account: string;
+  account_name: string;
+  transaction_count: number;
+  total_amount: number;
+  transactions: { date: string; person_description: string; control: string; amount: number }[];
+}
+
 export interface FinancialData {
   location: Location;
   month: string;
@@ -92,6 +109,14 @@ export interface FinancialData {
   scope_note: string;
   insights?: string[];
   variance_flags?: VarianceFlag[];
+  // Every posted transaction should carry a Control # prefix appropriate for
+  // its account section (R/K/C/J/P) and, for vendor-tagged accounts, match
+  // the vendor of record — these didn't. Answers "are the account #s correct."
+  control_violations?: ControlViolation[];
+  // Accounts with at least one journal-entry (J-prefixed) transaction this
+  // period — flagged for independent review regardless of whether the
+  // account's MoM variance breached the threshold above.
+  journal_entry_accounts?: JournalEntryAccount[];
 }
 
 export interface MonthlyRecord {
