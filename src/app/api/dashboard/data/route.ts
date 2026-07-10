@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { createServiceClient } from "@/lib/supabase/server";
+import { normalizeFinancialData } from "@/lib/normalize-financial-data";
 
 export const dynamic = "force-dynamic";
 
@@ -26,7 +27,9 @@ export async function GET(request: NextRequest) {
       .in("month", [month, getPriorMonth(month)]);
 
     if (error) return NextResponse.json({ error: error.message }, { status: 500 });
-    const records = [...(data ?? [])].sort((a, b) => monthSortKey(b.month) - monthSortKey(a.month));
+    const records = [...(data ?? [])]
+      .sort((a, b) => monthSortKey(b.month) - monthSortKey(a.month))
+      .map((r) => ({ ...r, data: normalizeFinancialData(r.data) }));
     return NextResponse.json({ records });
   }
 
@@ -43,7 +46,8 @@ export async function GET(request: NextRequest) {
     const trend = [...(data ?? [])]
       .sort((a, b) => monthSortKey(b.month) - monthSortKey(a.month))
       .slice(0, 12)
-      .sort((a, b) => monthSortKey(a.month) - monthSortKey(b.month));
+      .sort((a, b) => monthSortKey(a.month) - monthSortKey(b.month))
+      .map((r) => ({ ...r, data: normalizeFinancialData(r.data) }));
     return NextResponse.json({ trend });
   }
 
@@ -61,7 +65,7 @@ export async function GET(request: NextRequest) {
   const sorted = [...(all ?? [])].sort((a, b) => monthSortKey(b.month) - monthSortKey(a.month));
   const latest: Record<string, unknown> = {};
   for (const row of sorted) {
-    if (!latest[row.location]) latest[row.location] = row;
+    if (!latest[row.location]) latest[row.location] = { ...row, data: normalizeFinancialData(row.data) };
   }
 
   return NextResponse.json({ locations: Object.values(latest) });

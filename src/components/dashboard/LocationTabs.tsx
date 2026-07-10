@@ -11,11 +11,9 @@ interface Props {
   onChange: (loc: LocationTab) => void;
   flagCounts?: Partial<Record<Location, number>>;
   healthStatuses?: Partial<Record<Location, HealthStatus>>;
-  syncPeriod?: boolean;
-  onSyncToggle?: () => void;
 }
 
-export function LocationTabs({ active, onChange, flagCounts, healthStatuses, syncPeriod, onSyncToggle }: Props) {
+export function LocationTabs({ active, onChange, flagCounts, healthStatuses }: Props) {
   const hasHealth = LOCATIONS.some(l => healthStatuses?.[l]);
   return (
     <div className="rounded-lg border border-gray-200 bg-white px-1 pt-1">
@@ -67,39 +65,21 @@ export function LocationTabs({ active, onChange, flagCounts, healthStatuses, syn
         );
       })}
         </div>
-        {/* Health legend + period sync — inline right */}
-        <div className="flex items-center gap-3 flex-shrink-0 pb-px pr-1">
-          {hasHealth && (
-            <div className="hidden sm:flex items-center gap-2 border border-gray-200 rounded px-2 py-1">
-              <span className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider pr-1 border-r border-gray-200">NOI</span>
-              <div className="flex items-center gap-1 text-[11px] text-gray-500">
-                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 inline-block flex-shrink-0" />On pace
-              </div>
-              <div className="flex items-center gap-1 text-[11px] text-gray-500">
-                <span className="w-1.5 h-1.5 rounded-full bg-amber-400 inline-block flex-shrink-0" />At risk
-              </div>
-              <div className="flex items-center gap-1 text-[11px] text-gray-500">
-                <span className="w-1.5 h-1.5 rounded-full bg-red-500 inline-block flex-shrink-0" />Off track
-              </div>
+        {/* Health legend — inline right */}
+        {hasHealth && (
+          <div className="hidden sm:flex items-center gap-2 border border-gray-200 rounded px-2 py-1 flex-shrink-0 mb-1 mr-1">
+            <span className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider pr-1 border-r border-gray-200">NOI</span>
+            <div className="flex items-center gap-1 text-[11px] text-gray-500">
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 inline-block flex-shrink-0" />On pace
             </div>
-          )}
-          {onSyncToggle && (
-            <button
-              onClick={onSyncToggle}
-              title={syncPeriod
-                ? "All tabs locked to the same period — click to allow each tab its own period"
-                : "Lock all location tabs to the same period so you can compare the same month across locations"}
-              className={[
-                "text-[11px] font-medium px-2.5 py-0.5 rounded border transition-colors duration-150 cursor-pointer whitespace-nowrap",
-                syncPeriod
-                  ? "border-[#E07A3E]/40 bg-[#fdf2e9] text-[#E07A3E]"
-                  : "border-gray-200 text-gray-400 hover:text-gray-600 hover:border-gray-300",
-              ].join(" ")}
-            >
-              {syncPeriod ? "Unlock periods" : "Compare periods"}
-            </button>
-          )}
-        </div>
+            <div className="flex items-center gap-1 text-[11px] text-gray-500">
+              <span className="w-1.5 h-1.5 rounded-full bg-amber-400 inline-block flex-shrink-0" />At risk
+            </div>
+            <div className="flex items-center gap-1 text-[11px] text-gray-500">
+              <span className="w-1.5 h-1.5 rounded-full bg-red-500 inline-block flex-shrink-0" />Off track
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

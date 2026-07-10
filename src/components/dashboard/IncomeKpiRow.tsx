@@ -57,9 +57,9 @@ interface Props {
 export function IncomeKpiRow({ current, prior, runRateFactor, pacingPct }: Props) {
   const is = current.income_statement;
   const rev = is.revenue._total.actual;
-  const gp = is.gross_profit.actual;
   const noi = is.net_operating_income.actual;
   const ni = is.net_income.actual;
+  const netMargin = is.net_income.margin_pct;
   const budgetRev = is.revenue._total.budget;
   const budgetNoi = is.net_operating_income.budget;
 
@@ -68,7 +68,9 @@ export function IncomeKpiRow({ current, prior, runRateFactor, pacingPct }: Props
   const revDelta = !isPartial && prior ? momDelta(rev, prior.income_statement.revenue._total.actual) : null;
   const noiDelta = !isPartial && prior ? momDelta(noi, prior.income_statement.net_operating_income.actual) : null;
   const niDelta = !isPartial && prior ? momDelta(ni, prior.income_statement.net_income.actual) : null;
-  const gpDelta = !isPartial && prior ? momDelta(gp, prior.income_statement.gross_profit.actual) : null;
+  const netMarginDelta = !isPartial && prior
+    ? { diff: netMargin - prior.income_statement.net_income.margin_pct, positive: netMargin >= prior.income_statement.net_income.margin_pct }
+    : null;
 
   // Prorate budget comparison for partial months
   const effectivePacing = pacingPct ?? 1;
@@ -98,11 +100,11 @@ export function IncomeKpiRow({ current, prior, runRateFactor, pacingPct }: Props
         info={{ title: "Total Revenue", formula: "Workspace Rental + Meeting Space + Package Revenue + Member Amenities + Membership + Registration & Access + Miscellaneous", source: "Yardi Scheduler_Reports — 12-Month Income Statement" }}
       />
       <KpiCard
-        label="Gross Profit"
-        value={fmt(gp)}
-        sub={gpDelta?.label ?? mtdLabel}
-        subPositive={gpDelta ? gpDelta.positive : gp >= 0}
-        info={{ title: "Gross Profit", formula: "Total Revenue − Cost of Sales", source: "Yardi Scheduler_Reports", note: "Measures how much revenue remains after direct service costs, before overhead." }}
+        label="Net Margin"
+        value={`${netMargin.toFixed(1)}%`}
+        sub={netMarginDelta ? `${netMarginDelta.diff >= 0 ? "+" : ""}${netMarginDelta.diff.toFixed(1)}pp MoM` : mtdLabel}
+        subPositive={netMarginDelta ? netMarginDelta.positive : netMargin >= 0}
+        info={{ title: "Net Margin", formula: "Net Income ÷ Total Revenue", source: "Yardi Scheduler_Reports", note: "The bottom-line profitability rate — what share of every revenue dollar the location actually keeps after all expenses." }}
       />
       <KpiCard
         label="NOI"

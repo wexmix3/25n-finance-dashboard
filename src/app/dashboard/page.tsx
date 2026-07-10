@@ -3,6 +3,7 @@ import { createServerSupabaseClient, createServiceClient } from "@/lib/supabase/
 import { DashboardClient } from "./DashboardClient";
 import type { Location, MonthlyRecord, TrendPoint, OccupancyData, MonthlyPacket } from "@/types/dashboard";
 import { LOCATIONS } from "@/types/dashboard";
+import { normalizeFinancialData } from "@/lib/normalize-financial-data";
 
 const MONTH_NAMES = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 
@@ -36,9 +37,9 @@ export default async function DashboardPage() {
   const { data: allRecordsRaw } = await db
     .from("monthly_financials")
     .select("*");
-  const allRecords = [...(allRecordsRaw ?? [])].sort(
-    (a: MonthlyRecord, b: MonthlyRecord) => monthSortKey(b.month) - monthSortKey(a.month)
-  );
+  const allRecords = [...(allRecordsRaw ?? [])]
+    .sort((a: MonthlyRecord, b: MonthlyRecord) => monthSortKey(b.month) - monthSortKey(a.month))
+    .map((r: MonthlyRecord) => ({ ...r, data: normalizeFinancialData(r.data) }));
 
   const { data: occupancyRecordsRaw } = await db
     .from("monthly_occupancy")

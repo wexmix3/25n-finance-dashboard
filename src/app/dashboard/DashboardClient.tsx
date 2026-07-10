@@ -79,35 +79,24 @@ export function DashboardClient({ locationData, packetData, userEmail, role }: P
   const isConsolidated = activeTab === "Consolidated";
   const activeLocation: Location = isConsolidated ? LOCATIONS[0] : activeTab;
   const [selectedMonths, setSelectedMonths] = useState<Partial<Record<Location, string>>>({});
-  const [syncPeriod, setSyncPeriod] = useState(false);
-  const [syncedMonth, setSyncedMonth] = useState<string | null>(null);
-  const [activeView, setActiveView] = useState<"overview" | "gl" | "packet">("overview");
+  // Consolidated-only period selector — comparing the same period across all 5
+  // locations only makes sense there, so this is scoped separately from the
+  // per-location month pills (which stay independent per tab).
+  const [consolidatedMonth, setConsolidatedMonth] = useState<string | null>(null);
+  const [activeView, setActiveView] = useState<"overview" | "packet" | "gl" | "occupancy">("overview");
   const router = useRouter();
 
   const locData = locationData[activeLocation];
 
-  // Period selection: synced (same month for all tabs) or per-tab
-  const getSelectedMonth = (loc: Location) =>
-    syncPeriod ? syncedMonth : (selectedMonths[loc] ?? null);
-
-  const selectedMonth = getSelectedMonth(activeLocation);
+  const selectedMonth = selectedMonths[activeLocation] ?? null;
 
   const handleMonthSelect = (month: string) => {
-    if (syncPeriod) {
-      setSyncedMonth(month);
-    } else {
-      setSelectedMonths(prev => ({ ...prev, [activeLocation]: month }));
-    }
+    setSelectedMonths(prev => ({ ...prev, [activeLocation]: month }));
   };
 
-  const handleSyncToggle = () => {
-    if (!syncPeriod) {
-      // Turning on: initialize sync to current active month
-      const currentActiveMonth = selectedMonths[activeLocation] ?? locData.availableMonths[0] ?? null;
-      setSyncedMonth(currentActiveMonth);
-    }
-    setSyncPeriod(v => !v);
-  };
+  const consolidatedMonths = Array.from(
+    new Set(LOCATIONS.flatMap(loc => locationData[loc].availableMonths))
+  );
 
   let current: MonthlyRecord | null;
   let prior: MonthlyRecord | null;
@@ -214,22 +203,54 @@ export function DashboardClient({ locationData, packetData, userEmail, role }: P
       {/* Main */}
       <main className="max-w-7xl mx-auto w-full px-4 sm:px-6 py-6 space-y-5 flex-1">
 
-        {/* Location tabs with health legend + sync toggle */}
+        {/* Location tabs with health legend */}
         <LocationTabs
           active={activeTab}
           onChange={setActiveTab}
           flagCounts={flagCounts}
           healthStatuses={healthStatuses}
-          syncPeriod={syncPeriod}
-          onSyncToggle={handleSyncToggle}
         />
 
-        {/* Consolidated view — all 5 locations, no single period selected */}
+        {/* Consolidated view — all 5 locations, one shared period selector */}
         {isConsolidated ? (
-          <div className="space-y-1">
-            <div>
-              <h2 className="text-sm font-semibold text-gray-900">All Locations</h2>
-              <p className="text-xs text-gray-400 mt-0.5">Most recent closed period per location — select a location tab above for full detail.</p>
+          <div className="space-y-3">
+            <div className="flex items-center justify-between gap-3 flex-wrap">
+              <div>
+                <h2 className="text-sm font-semibold text-gray-900">All Locations</h2>
+                <p className="text-xs text-gray-400 mt-0.5">
+                  {consolidatedMonth ? `${consolidatedMonth} — same period across all locations` : "Most recent closed period per location"}
+                </p>
+              </div>
+              {consolidatedMonths.length > 1 && (() => {
+                const MONTH_IDX = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+                const parseM = (m: string) => { const [mon, yr] = m.split(" "); return parseInt(yr) * 12 + MONTH_IDX.indexOf(mon); };
+                const sorted = [...consolidatedMonths].sort((a, b) => parseM(b) - parseM(a));
+                return (
+                  <div className="flex items-center gap-1 overflow-x-auto scrollbar-none flex-nowrap">
+                    <button
+                      onClick={() => setConsolidatedMonth(null)}
+                      className={[
+                        "px-2.5 py-1 rounded text-xs font-medium transition-colors duration-150 cursor-pointer flex-shrink-0",
+                        consolidatedMonth === null ? "bg-[#E07A3E] text-white" : "bg-gray-100 text-gray-500 hover:bg-gray-200",
+                      ].join(" ")}
+                    >
+                      Latest
+                    </button>
+                    {sorted.map((month) => (
+                      <button
+                        key={month}
+                        onClick={() => setConsolidatedMonth(month)}
+                        className={[
+                          "px-2.5 py-1 rounded text-xs font-medium transition-colors duration-150 cursor-pointer flex-shrink-0",
+                          consolidatedMonth === month ? "bg-[#E07A3E] text-white" : "bg-gray-100 text-gray-500 hover:bg-gray-200",
+                        ].join(" ")}
+                      >
+                        {month}
+                      </button>
+                    ))}
+                  </div>
+                );
+              })()}
             </div>
             <LocationSummaryTable
               locationData={Object.fromEntries(
@@ -238,7 +259,7 @@ export function DashboardClient({ locationData, packetData, userEmail, role }: P
                   allRecords: locationData[loc].allRecords,
                 }])
               ) as Record<Location, { current: MonthlyRecord | null; allRecords: MonthlyRecord[] }>}
-              selectedMonth={null}
+              selectedMonth={consolidatedMonth}
             />
           </div>
         ) : (
@@ -272,13 +293,14 @@ export function DashboardClient({ locationData, packetData, userEmail, role }: P
           );
         })()}
 
-        {/* View tabs: Overview | GL Check | Packet */}
+        {/* View tabs: Overview | Financial Packet | GL Check | Occupancy */}
         <div className="flex items-center gap-1 border-b border-gray-200 pb-0">
-          {(["overview", "gl", "packet"] as const).map((view) => {
+          {(["overview", "packet", "gl", "occupancy"] as const).map((view) => {
             const labels: Record<typeof view, string> = {
               overview: "Overview",
-              gl: "GL Check",
               packet: "Financial Packet",
+              gl: "GL Check",
+              occupancy: "Occupancy",
             };
             const active = activeView === view;
             return (
@@ -350,6 +372,11 @@ export function DashboardClient({ locationData, packetData, userEmail, role }: P
           )
         )}
 
+        {/* Occupancy view */}
+        {activeView === "occupancy" && (
+          <OccupancySection current={occupancy} prior={priorOccupancy} />
+        )}
+
         {/* Overview view */}
         {activeView === "overview" && currentData ? (
           <>
@@ -388,28 +415,14 @@ export function DashboardClient({ locationData, packetData, userEmail, role }: P
               <InsightsPanel insights={currentData.insights ?? []} />
             )}
 
-            {/* Cross-location snapshot */}
-            <LocationSummaryTable
-              locationData={Object.fromEntries(
-                LOCATIONS.map(loc => [loc, {
-                  current: locationData[loc].current,
-                  allRecords: locationData[loc].allRecords,
-                }])
-              ) as Record<Location, { current: MonthlyRecord | null; allRecords: MonthlyRecord[] }>}
-              selectedMonth={selectedMonth}
-            />
-
             {/* P&L table */}
             <PlTable current={currentData} prior={priorData} pacingPct={isFullMonth ? null : pacingPct} />
 
-            {/* Occupancy */}
-            {occupancy && <OccupancySection current={occupancy} prior={priorOccupancy} />}
-
-            {/* Variance analysis */}
+            {/* Variance analysis — section-level flags only; account-level detail lives on GL Check */}
             <VariancePanel
               current={currentData}
               prior={priorData}
-              glFlags={currentData.variance_flags ?? []}
+              glFlags={[]}
               priorMonth={priorMonth}
               pacingPct={isFullMonth ? null : pacingPct}
             />
