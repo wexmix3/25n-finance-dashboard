@@ -57,7 +57,13 @@ export function LocationTabs({ active, onChange, flagCounts, healthStatuses }: P
             )}
             {loc}
             {flags > 0 && (
-              <span className="inline-flex items-center justify-center min-w-[16px] h-4 px-1 text-[10px] font-bold rounded-full bg-red-500 text-white leading-none">
+              // Same 3-tier severity as the GL Check tab's own status pill
+              // (0 = clean, 1–5 = amber "at risk", 6+ = red) — this badge
+              // used to be red at any count, contradicting an amber "at
+              // risk" status shown one click away for the same number.
+              <span className={`inline-flex items-center justify-center min-w-[16px] h-4 px-1 text-[10px] font-bold rounded-full text-white leading-none ${
+                flags <= 5 ? "bg-amber-500" : "bg-red-500"
+              }`}>
                 {flags}
               </span>
             )}

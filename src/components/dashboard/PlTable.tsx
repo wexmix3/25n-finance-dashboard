@@ -53,11 +53,19 @@ function Row({ label, actual, budget, prior, indent, bold, isExpense, highlight,
     neutral: "bg-gray-50",
   };
   const rowBg = highlight ? bgMap[highlight] : "";
-  const cols = showRevPct ? "[grid-template-columns:2fr_repeat(5,1fr)]" : "[grid-template-columns:2fr_repeat(4,1fr)]";
+  // Sticky label column needs its own opaque background (not just the row's)
+  // since scrolled-past cells would otherwise show through underneath it.
+  const labelBg = highlight ? bgMap[highlight] : "bg-white";
+  // minmax floors force the row to overflow (and scroll) on narrow
+  // viewports instead of shrinking every column into truncated mush —
+  // that's what makes the sticky label column below actually useful.
+  const cols = showRevPct
+    ? "[grid-template-columns:minmax(110px,2fr)_repeat(5,minmax(76px,1fr))]"
+    : "[grid-template-columns:minmax(110px,2fr)_repeat(4,minmax(76px,1fr))]";
 
   return (
     <div className={`grid gap-2 py-1.5 text-sm border-b border-gray-100 last:border-0 ${cols} ${rowBg} ${bold ? "font-semibold" : ""}`}>
-      <span className={`text-gray-700 ${indent ? "pl-4" : ""} truncate`}>{label}</span>
+      <span className={`sticky left-0 z-10 text-gray-700 ${labelBg} ${indent ? "pl-4" : ""} truncate`}>{label}</span>
       <span className={`text-right tabular-nums ${actual !== undefined && actual < 0 ? "text-red-600" : "text-gray-900"}`}>
         {actual !== undefined ? fmtDollar(actual, acctStyle) : ""}
       </span>
@@ -86,10 +94,15 @@ function Row({ label, actual, budget, prior, indent, bold, isExpense, highlight,
 }
 
 function SectionHeader({ label, showRevPct, budgetLabel }: { label: string; showRevPct?: boolean; budgetLabel: string }) {
-  const cols = showRevPct ? "[grid-template-columns:2fr_repeat(5,1fr)]" : "[grid-template-columns:2fr_repeat(4,1fr)]";
+  // minmax floors force the row to overflow (and scroll) on narrow
+  // viewports instead of shrinking every column into truncated mush —
+  // that's what makes the sticky label column below actually useful.
+  const cols = showRevPct
+    ? "[grid-template-columns:minmax(110px,2fr)_repeat(5,minmax(76px,1fr))]"
+    : "[grid-template-columns:minmax(110px,2fr)_repeat(4,minmax(76px,1fr))]";
   return (
     <div className={`grid gap-2 py-2 text-xs font-semibold text-gray-500 uppercase tracking-wider border-b border-gray-200 mt-3 ${cols}`}>
-      <span>{label}</span>
+      <span className="sticky left-0 z-10 bg-white">{label}</span>
       <span className="text-right">MTD Actual</span>
       <span className="text-right">{budgetLabel}</span>
       <span className="text-right">vs Budget</span>
@@ -110,12 +123,17 @@ function SubtotalRow({ label, actual, budget, prior, isExpense, borderStrength =
   const isKeyLine = borderStrength === "double";
   const borderClass = isKeyLine ? "border-b-2 border-gray-300" : "border-b border-gray-200";
   const bgClass = isKeyLine ? "bg-gray-50 rounded" : "bg-gray-50/50";
-  const cols = showRevPct ? "[grid-template-columns:2fr_repeat(5,1fr)]" : "[grid-template-columns:2fr_repeat(4,1fr)]";
+  // minmax floors force the row to overflow (and scroll) on narrow
+  // viewports instead of shrinking every column into truncated mush —
+  // that's what makes the sticky label column below actually useful.
+  const cols = showRevPct
+    ? "[grid-template-columns:minmax(110px,2fr)_repeat(5,minmax(76px,1fr))]"
+    : "[grid-template-columns:minmax(110px,2fr)_repeat(4,minmax(76px,1fr))]";
 
   return (
     <div className={`grid gap-2 py-2.5 text-sm font-bold mt-1 ${borderClass} ${bgClass} ${cols} ${isKeyLine ? "border-l-2 border-l-[#E07A3E] pl-2 -ml-2" : ""}`}>
-      <span className={`${isKeyLine ? "text-gray-900 text-base" : "text-gray-800"}`}>{label}</span>
-      <span className={`text-right tabular-nums ${actual < 0 ? "text-red-600" : "text-emerald-600"}`}>
+      <span className={`sticky left-0 z-10 bg-gray-50 ${isKeyLine ? "text-gray-900 text-base" : "text-gray-800"}`}>{label}</span>
+      <span className={`text-right tabular-nums ${actual < 0 ? "text-red-600" : "text-gray-900"}`}>
         {fmtDollar(actual, acctStyle)}
       </span>
       <span className={`text-right tabular-nums ${effectiveBudget !== null && effectiveBudget < 0 ? "text-red-400" : "text-gray-400"}`}>

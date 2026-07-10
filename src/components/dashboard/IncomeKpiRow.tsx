@@ -20,6 +20,7 @@ function momDelta(current: number, prior: number): { label: string; positive: bo
 interface KpiCardProps {
   label: string;
   value: string;
+  valueNegative?: boolean;
   sub?: string;
   subPositive?: boolean;
   projection?: string;
@@ -27,7 +28,7 @@ interface KpiCardProps {
   info?: { title: string; formula?: string; source?: string; note?: string };
 }
 
-function KpiCard({ label, value, sub, subPositive, projection, highlight, info }: KpiCardProps) {
+function KpiCard({ label, value, valueNegative, sub, subPositive, projection, highlight, info }: KpiCardProps) {
   // Flat, borderless stat tile — deliberately distinct from the bordered
   // white "container" cards (tables, panels) elsewhere on the dashboard, so
   // a glanceable number and a detailed data table don't carry equal visual
@@ -39,7 +40,9 @@ function KpiCard({ label, value, sub, subPositive, projection, highlight, info }
         {label}
         {info && <InfoPopover {...info} />}
       </p>
-      <p className="mt-1 text-3xl font-bold tabular-nums tracking-tight text-gray-900">{value}</p>
+      {/* Negative = red, everything else = neutral — same convention as the
+          P&L table below it, so a loss reads the same way in both places. */}
+      <p className={`mt-1 text-3xl font-bold tabular-nums tracking-tight ${valueNegative ? "text-red-600" : "text-gray-900"}`}>{value}</p>
       {sub && (
         <p className={`mt-0.5 text-xs font-medium ${subPositive === undefined ? "text-gray-400" : subPositive ? "text-emerald-600" : "text-red-500"}`}>
           {sub}
@@ -101,10 +104,14 @@ export function IncomeKpiRow({ current, prior, runRateFactor, pacingPct }: Props
   const budgetNote = isPartial ? `vs ${Math.round(effectivePacing * 100)}% of budget` : "vs full-month budget";
 
   return (
-    <div className="grid grid-cols-2 gap-3 md:grid-cols-3 lg:grid-cols-6">
+    <div className="flex flex-col gap-3 lg:flex-row lg:items-stretch">
+    <div className="flex-1">
+      <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider mb-1.5 px-0.5">This period vs. last</p>
+      <div className="grid grid-cols-2 gap-3 md:grid-cols-4 h-[calc(100%-1.375rem)]">
       <KpiCard
         label="Revenue"
         value={fmt(rev)}
+        valueNegative={rev < 0}
         sub={revDelta?.label ?? mtdLabel}
         subPositive={revDelta?.positive}
         projection={projRev}
@@ -113,6 +120,7 @@ export function IncomeKpiRow({ current, prior, runRateFactor, pacingPct }: Props
       <KpiCard
         label="Net Margin"
         value={`${netMargin.toFixed(1)}%`}
+        valueNegative={netMargin < 0}
         sub={netMarginDelta ? `${netMarginDelta.diff >= 0 ? "+" : ""}${netMarginDelta.diff.toFixed(1)}pp MoM` : mtdLabel}
         subPositive={netMarginDelta ? netMarginDelta.positive : netMargin >= 0}
         info={{ title: "Net Margin", formula: "Net Income ÷ Total Revenue", source: "Yardi Scheduler_Reports", note: "The bottom-line profitability rate — what share of every revenue dollar the location actually keeps after all expenses." }}
@@ -120,17 +128,28 @@ export function IncomeKpiRow({ current, prior, runRateFactor, pacingPct }: Props
       <KpiCard
         label="NOI"
         value={fmt(noi)}
-        sub={`${is.net_operating_income.margin_pct.toFixed(1)}% operating margin`}
-        subPositive={noiDelta ? noiDelta.positive : noi >= 0}
+        valueNegative={noi < 0}
+        sub={noiDelta?.label ?? mtdLabel}
+        subPositive={noiDelta?.positive}
+        projection={`${is.net_operating_income.margin_pct.toFixed(1)}% operating margin`}
         info={{ title: "Net Operating Income (NOI)", formula: "Gross Profit − Total Operating Expenses", source: "Yardi Scheduler_Reports", note: "Operating Margin = NOI ÷ Revenue. Primary profitability metric for coworking — positive NOI means the location covers all operating costs from its own revenue." }}
       />
       <KpiCard
         label="Net Income"
         value={fmt(ni)}
+        valueNegative={ni < 0}
         sub={niDelta?.label ?? mtdLabel}
         subPositive={niDelta ? niDelta.positive : ni >= 0}
         info={{ title: "Net Income", formula: "NOI + Other Income − Other Expenses", source: "Yardi Scheduler_Reports" }}
       />
+      </div>
+    </div>
+
+    <div className="hidden lg:block w-px bg-gray-200 my-1" />
+
+    <div className="lg:w-[300px] lg:flex-shrink-0">
+      <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider mb-1.5 px-0.5">This period vs. budget</p>
+      <div className="grid grid-cols-2 gap-3 h-[calc(100%-1.375rem)]">
       <KpiCard
         label="Revenue vs Budget"
         value={
@@ -156,8 +175,11 @@ export function IncomeKpiRow({ current, prior, runRateFactor, pacingPct }: Props
         }
         sub={noiMissTooSmallForPct ? "budget too small for a % — showing $ miss" : budgetNote}
         subPositive={vsBudgetNoi !== null ? vsBudgetNoi >= 0 : noiMissTooSmallForPct ? noi >= proratedNoiBudget : undefined}
+        highlight
         info={{ title: "NOI vs Budget", formula: isPartial ? `(MTD NOI − NOI Budget × ${Math.round(effectivePacing * 100)}%) ÷ |Prorated NOI Budget|` : "(NOI − Full-Month NOI Budget) ÷ |NOI Budget|", source: "NOI budget from Yardi Budget Comparison export", note: `Key signal for whether the location is on track for its profitability target. Below a $${PCT_DENOMINATOR_FLOOR.toLocaleString()} budget, the % swings wildly (a small-dollar miss reads as +1000%+), so the $ miss is shown instead.` }}
       />
+      </div>
+    </div>
     </div>
   );
 }

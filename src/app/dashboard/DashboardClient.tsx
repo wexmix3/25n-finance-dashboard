@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { createBrowserSupabaseClient } from "@/lib/supabase/browser";
 import { LOCATIONS, Location } from "@/types/dashboard";
@@ -46,10 +46,13 @@ function computeLocPacingPct(month: string, uploadedAt: string): number | null {
   const monthIdx = monthNames.indexOf(monStr);
   const year = parseInt(yearStr);
   if (monthIdx === -1 || isNaN(year)) return null;
-  const daysInMonth = new Date(year, monthIdx + 1, 0).getDate();
+  // UTC throughout — see identical fix + rationale in PeriodBanner.tsx
+  // (server runs UTC, browser runs Eastern; local-TZ date methods produced
+  // different calendar days for the same timestamp and tripped React #418).
+  const daysInMonth = new Date(Date.UTC(year, monthIdx + 1, 0)).getUTCDate();
   const uploadDate = new Date(uploadedAt);
-  if (uploadDate.getFullYear() === year && uploadDate.getMonth() === monthIdx) {
-    return uploadDate.getDate() / daysInMonth;
+  if (uploadDate.getUTCFullYear() === year && uploadDate.getUTCMonth() === monthIdx) {
+    return uploadDate.getUTCDate() / daysInMonth;
   }
   return 1;
 }
@@ -75,6 +78,20 @@ function buildPeriodTrend(allRecords: MonthlyRecord[], endMonth: string): TrendP
   }));
 }
 
+function NoLocationData({ location, detail }: { location: string; detail: string }) {
+  return (
+    <div className="bg-white rounded-lg border border-gray-200 p-12 text-center">
+      <div className="w-10 h-10 rounded-full bg-gray-100 flex items-center justify-center mx-auto mb-4">
+        <svg className="w-5 h-5 text-gray-400" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+          <path strokeLinecap="round" strokeLinejoin="round" d="M3 13.125C3 12.504 3.504 12 4.125 12h2.25c.621 0 1.125.504 1.125 1.125v6.75C7.5 20.496 6.996 21 6.375 21h-2.25A1.125 1.125 0 0 1 3 19.875v-6.75ZM9.75 8.625c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125v11.25c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 0 1-1.125-1.125V8.625ZM16.5 4.125c0-.621.504-1.125 1.125-1.125h2.25C20.496 3 21 3.504 21 4.125v15.75c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 0 1-1.125-1.125V4.125Z" />
+        </svg>
+      </div>
+      <p className="text-sm font-semibold text-gray-700">No data for {location}</p>
+      <p className="text-xs text-gray-400 mt-1">{detail}</p>
+    </div>
+  );
+}
+
 export function DashboardClient({ locationData, packetData, userEmail, role }: Props) {
   const [activeTab, setActiveTab] = useState<LocationTab>(LOCATIONS[0]);
   const isConsolidated = activeTab === "Consolidated";
@@ -89,6 +106,13 @@ export function DashboardClient({ locationData, packetData, userEmail, role }: P
   // without waiting on a full server refetch. Keyed by "location|month".
   const [reviewOverrides, setReviewOverrides] = useState<Record<string, boolean>>({});
   const router = useRouter();
+
+  // "Days stale" is a function of wall-clock now, not of the data — computing
+  // it at render time makes the SSR pass and the hydration pass disagree
+  // (the two happen seconds to minutes apart). Only compute after mount so
+  // the first client render matches what the server sent.
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => setMounted(true), []);
 
   const locData = locationData[activeLocation];
 
@@ -116,8 +140,17 @@ export function DashboardClient({ locationData, packetData, userEmail, role }: P
   } else {
     current = locData.current;
     prior = locData.prior;
-    occupancy = locData.occupancy;
-    priorOccupancy = locData.priorOccupancy;
+    // Occupancy is uploaded on its own cadence (Kube tracker), so its most
+    // recent record can land on a different month than the most recent
+    // financial close — pinning it to the financial month being shown
+    // instead of its own independent "latest" avoids a Jun/Jul-style
+    // mismatch between the two panels on the same page.
+    const currentFinMonth = current?.month;
+    occupancy = currentFinMonth
+      ? locData.allOccupancy.find(o => o.month === currentFinMonth)?.data ?? null
+      : null;
+    const priorStr = current ? getPriorMonthLabel(current.month) : null;
+    priorOccupancy = priorStr ? locData.allOccupancy.find(o => o.month === priorStr)?.data ?? null : null;
   }
 
   const currentData: FinancialData | null = current?.data ?? null;
@@ -166,7 +199,7 @@ export function DashboardClient({ locationData, packetData, userEmail, role }: P
     }
   }
 
-  const daysStale = uploadedAt
+  const daysStale = mounted && uploadedAt
     ? Math.floor((Date.now() - new Date(uploadedAt).getTime()) / 86400000)
     : null;
   const isStale = daysStale !== null && daysStale > 14;
@@ -282,8 +315,12 @@ export function DashboardClient({ locationData, packetData, userEmail, role }: P
                   const glIssues = (currentData?.variance_flags?.length ?? 0) + (currentData?.control_violations?.length ?? 0) + (currentData?.journal_entry_accounts?.length ?? 0);
                   const reviewKey = current ? `${activeLocation}|${current.month}` : "";
                   const isReviewed = reviewOverrides[reviewKey] ?? current?.gl_reviewed ?? false;
+                  // Same 3-tier severity as GLCheckTab's own status pill and
+                  // the location-tab badge — was always red regardless of count.
                   return glIssues > 0 && !isReviewed && (
-                    <span className="ml-1.5 inline-flex items-center justify-center w-4 h-4 rounded-full bg-red-100 text-red-700 text-[10px] font-bold">
+                    <span className={`ml-1.5 inline-flex items-center justify-center w-4 h-4 rounded-full text-[10px] font-bold ${
+                      glIssues <= 5 ? "bg-amber-100 text-amber-700" : "bg-red-100 text-red-700"
+                    }`}>
                       {glIssues}
                     </span>
                   );
@@ -305,15 +342,21 @@ export function DashboardClient({ locationData, packetData, userEmail, role }: P
           </div>
         )}
 
-        {/* Period banner */}
-        <PeriodBanner
-          currentMonth={currentMonth}
-          priorMonth={priorMonth}
-          uploadedAt={current?.uploaded_at}
-          locked={prior?.locked}
-          role={role}
-          location={activeLocation}
-        />
+        {/* Period banner — only when there's a real period to show. With zero
+            records (e.g. a location before its first upload), currentMonth
+            falls back to "—" and priorMonth to "Prior", which rendered a
+            confusing half-populated banner directly above the "No data"
+            empty state below. */}
+        {current && (
+          <PeriodBanner
+            currentMonth={currentMonth}
+            priorMonth={priorMonth}
+            uploadedAt={current?.uploaded_at}
+            locked={prior?.locked}
+            role={role}
+            location={activeLocation}
+          />
+        )}
 
         {/* GL Check view */}
         {activeView === "gl" && (
@@ -330,9 +373,7 @@ export function DashboardClient({ locationData, packetData, userEmail, role }: P
               }
             />
           ) : (
-            <div className="bg-white rounded-lg border border-gray-200 p-8 text-center">
-              <p className="text-sm text-gray-400">No data for {activeLocation} — upload GL data first.</p>
-            </div>
+            <NoLocationData location={activeLocation} detail="GL data for this location hasn't been uploaded yet." />
           )
         )}
 
@@ -344,15 +385,13 @@ export function DashboardClient({ locationData, packetData, userEmail, role }: P
               packet={packetData[activeLocation] ?? null}
             />
           ) : (
-            <div className="bg-white rounded-lg border border-gray-200 p-8 text-center">
-              <p className="text-sm text-gray-400">No data for {activeLocation} — upload GL data first.</p>
-            </div>
+            <NoLocationData location={activeLocation} detail="Financial data for this location hasn't been uploaded yet." />
           )
         )}
 
         {/* Occupancy view */}
         {activeView === "occupancy" && (
-          <OccupancySection current={occupancy} prior={priorOccupancy} />
+          <OccupancySection current={occupancy} prior={priorOccupancy} expectedMonth={currentMonth !== "—" ? currentMonth : undefined} />
         )}
 
         {/* Overview view */}
@@ -409,17 +448,7 @@ export function DashboardClient({ locationData, packetData, userEmail, role }: P
             <TrendChart data={periodTrend} />
           </>
         ) : activeView === "overview" ? (
-          <div className="bg-white rounded-lg border border-gray-200 p-12 text-center">
-            <div className="w-10 h-10 rounded-full bg-gray-100 flex items-center justify-center mx-auto mb-4">
-              <svg className="w-5 h-5 text-gray-400" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" d="M3 13.125C3 12.504 3.504 12 4.125 12h2.25c.621 0 1.125.504 1.125 1.125v6.75C7.5 20.496 6.996 21 6.375 21h-2.25A1.125 1.125 0 0 1 3 19.875v-6.75ZM9.75 8.625c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125v11.25c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 0 1-1.125-1.125V8.625ZM16.5 4.125c0-.621.504-1.125 1.125-1.125h2.25C20.496 3 21 3.504 21 4.125v15.75c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 0 1-1.125-1.125V4.125Z" />
-              </svg>
-            </div>
-            <p className="text-sm font-semibold text-gray-700">No data for {activeLocation}</p>
-            <p className="text-xs text-gray-400 mt-1">
-              Financial data for this location hasn&apos;t been uploaded yet.
-            </p>
-          </div>
+          <NoLocationData location={activeLocation} detail="Financial data for this location hasn't been uploaded yet." />
         ) : null}
         </>
         )}

@@ -17,10 +17,14 @@ function computePacing(month: string, uploadedAt: string): { daysElapsed: number
   const monthIdx = monthNames.indexOf(monStr);
   const year = parseInt(yearStr);
   if (monthIdx === -1 || isNaN(year)) return null;
-  const daysInMonth = new Date(year, monthIdx + 1, 0).getDate();
+  // UTC throughout: the server (Vercel, UTC) and the browser (Eastern) would
+  // otherwise read a different calendar day off the same timestamp whenever
+  // an upload lands late evening Eastern (already past midnight UTC), which
+  // makes the SSR'd text and the hydrated text disagree (React error #418).
+  const daysInMonth = new Date(Date.UTC(year, monthIdx + 1, 0)).getUTCDate();
   const uploadDate = new Date(uploadedAt);
-  if (uploadDate.getFullYear() === year && uploadDate.getMonth() === monthIdx) {
-    return { daysElapsed: uploadDate.getDate(), daysInMonth };
+  if (uploadDate.getUTCFullYear() === year && uploadDate.getUTCMonth() === monthIdx) {
+    return { daysElapsed: uploadDate.getUTCDate(), daysInMonth };
   }
   // Upload is in a later month — this is a closed period, full month elapsed
   return { daysElapsed: daysInMonth, daysInMonth };
@@ -38,7 +42,7 @@ export function PeriodBanner({ currentMonth, priorMonth, uploadedAt, locked, rol
   const isFull = pacing ? pacing.daysElapsed === pacing.daysInMonth : false;
 
   const uploadLabel = uploadedAt
-    ? `updated ${new Date(uploadedAt).toLocaleDateString("en-US", { month: "short", day: "numeric" })}`
+    ? `updated ${new Date(uploadedAt).toLocaleDateString("en-US", { month: "short", day: "numeric", timeZone: "UTC" })}`
     : "no data";
 
   async function handleLock() {

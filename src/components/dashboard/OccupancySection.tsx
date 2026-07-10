@@ -3,6 +3,7 @@ import type { OccupancyData } from "@/types/dashboard";
 interface Props {
   current: OccupancyData | null;
   prior: OccupancyData | null;
+  expectedMonth?: string;
 }
 
 function delta(curr: number | undefined, prev: number | undefined): string | null {
@@ -22,7 +23,7 @@ function fmt$(n: number | undefined): string {
   return `$${Math.round(n).toLocaleString()}`;
 }
 
-export function OccupancySection({ current, prior }: Props) {
+export function OccupancySection({ current, prior, expectedMonth }: Props) {
   if (!current) {
     return (
       <div className="bg-white rounded-lg border border-gray-200 p-5 flex items-center gap-4">
@@ -32,8 +33,14 @@ export function OccupancySection({ current, prior }: Props) {
           </svg>
         </div>
         <div>
-          <p className="text-sm font-semibold text-gray-700">Occupancy Data Pending</p>
-          <p className="text-xs text-gray-400 mt-0.5">Occupancy data will appear here once the first monthly tracker is processed.</p>
+          <p className="text-sm font-semibold text-gray-700">
+            {expectedMonth ? `No Occupancy Data for ${expectedMonth}` : "Occupancy Data Pending"}
+          </p>
+          <p className="text-xs text-gray-400 mt-0.5">
+            {expectedMonth
+              ? `The Kube tracker for ${expectedMonth} hasn't been uploaded yet — occupancy runs on its own upload cadence, separate from the financial close.`
+              : "Occupancy data will appear here once the first monthly tracker is processed."}
+          </p>
         </div>
       </div>
     );
