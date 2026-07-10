@@ -28,8 +28,13 @@ interface KpiCardProps {
 }
 
 function KpiCard({ label, value, sub, subPositive, projection, highlight, info }: KpiCardProps) {
+  // Flat, borderless stat tile — deliberately distinct from the bordered
+  // white "container" cards (tables, panels) elsewhere on the dashboard, so
+  // a glanceable number and a detailed data table don't carry equal visual
+  // weight. The single most important metric gets a colored left accent
+  // instead of a full border, keeping the emphasis without adding a box.
   return (
-    <div className={`rounded-lg border bg-white p-4 ${highlight ? "border-l-4 border-[#E07A3E]/50" : "border-gray-200"}`}>
+    <div className={`rounded-lg bg-gray-50 p-4 ${highlight ? "border-l-4 border-[#E07A3E]" : ""}`}>
       <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider flex items-center">
         {label}
         {info && <InfoPopover {...info} />}

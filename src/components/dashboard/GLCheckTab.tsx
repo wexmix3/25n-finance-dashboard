@@ -108,27 +108,30 @@ export function GLCheckTab({ currentData, priorMonth, uploadedAt, reviewed, revi
         </div>
       )}
 
-      {/* Stat chips — three distinct checks, each answers a different question */}
+      {/* Stat chips — three distinct checks, each answers a different question.
+          Flat, borderless tiles (not the bordered white "container" cards
+          used for the tables below) so the headline counts and the detailed
+          data don't compete for the same visual weight. */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-        <div className="bg-white rounded-lg border border-gray-200 p-4 text-center">
+        <div className="bg-gray-50 rounded-lg p-4 text-center">
           <p className={`text-2xl font-bold ${flagCount === 0 ? "text-emerald-600" : "text-amber-600"}`}>
             {flagCount}
           </p>
           <p className="text-xs text-gray-400 mt-0.5">Variance Flags</p>
         </div>
-        <div className="bg-white rounded-lg border border-gray-200 p-4 text-center">
+        <div className="bg-gray-50 rounded-lg p-4 text-center">
           <p className={`text-2xl font-bold ${violations.length === 0 ? "text-emerald-600" : "text-red-600"}`}>
             {violations.length}
           </p>
           <p className="text-xs text-gray-400 mt-0.5">Control # Issues</p>
         </div>
-        <div className="bg-white rounded-lg border border-gray-200 p-4 text-center">
+        <div className="bg-gray-50 rounded-lg p-4 text-center">
           <p className={`text-2xl font-bold ${jeAccounts.length === 0 ? "text-emerald-600" : "text-amber-700"}`}>
             {jeAccounts.length}
           </p>
           <p className="text-xs text-gray-400 mt-0.5">Needs JE Review</p>
         </div>
-        <div className="bg-white rounded-lg border border-gray-200 p-4 text-center">
+        <div className="bg-gray-50 rounded-lg p-4 text-center">
           <p className="text-2xl font-bold text-gray-700">{currentData.month}</p>
           <p className="text-xs text-gray-400 mt-0.5">Current Period vs {priorMonth}</p>
         </div>
