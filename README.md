@@ -16,6 +16,12 @@ bun dev
 
 Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
 
+## Pre-commit lint hook
+
+Staged `.ts`/`.tsx`/`.js`/`.jsx` files are run through `eslint --fix` on every commit (via husky + lint-staged). Auto-fixable issues are fixed and re-staged automatically; anything ESLint can't fix blocks the commit with the error printed in your terminal.
+
+Emergency bypass (use sparingly): `git commit --no-verify`
+
 You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
 
 This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
