@@ -38,8 +38,8 @@ const SECTIONS: Section[] = [
     metrics: [
       { name: "Gross Profit", formula: "Total Revenue − Total Cost of Sales", source: "Computed by build_statements.py" },
       { name: "GP Margin %", formula: "Gross Profit ÷ Total Revenue × 100", source: "Computed by build_statements.py" },
-      { name: "NOI (Net Operating Income)", formula: "Gross Profit − Total OPEX", source: "Computed by build_statements.py", note: "Primary performance metric for coworking locations. A positive NOI means the location covers all operating costs from its own revenue." },
-      { name: "Net Income", formula: "NOI + Other Income − Other Expenses", source: "Computed by build_statements.py" },
+      { name: "NOI (Net Operating Income)", formula: "Gross Profit − Total OPEX", source: "Computed by build_statements.py", note: "Still computed and shown on the trend chart. A positive NOI means the location covers all operating costs from its own revenue — but Net Income is the headline profitability metric on the Overview page, since 25N has minimal non-operating activity." },
+      { name: "Net Income", formula: "NOI + Other Income − Other Expenses", source: "Computed by build_statements.py", note: "Primary profitability metric shown on the Overview page — NOI is no longer shown alongside it there to avoid presenting two near-identical numbers." },
     ],
   },
   {
@@ -59,16 +59,16 @@ const SECTIONS: Section[] = [
       { name: "Budget (Full Mo.)", formula: "Full-month budget as entered in Yardi for the period", source: "Yardi Scheduler_Reports — Budget Comparison export" },
       { name: "Budget (X% pace)", formula: "Full-month budget × (days elapsed ÷ days in month)", source: "Computed from upload_at timestamp vs period month", note: "Used when viewing a partial (MTD) period so budget comparisons reflect the same elapsed time, not the full month target." },
       { name: "vs Budget (Δ)", formula: "Actual − Effective Budget", source: "Computed. Green = favorable, Red = unfavorable" },
-      { name: "Revenue vs Budget %", formula: "(MTD Revenue − Prorated Budget) ÷ |Prorated Budget| × 100", source: "Computed using prorated budget for MTD periods" },
-      { name: "NOI vs Budget %", formula: "(MTD NOI − Prorated NOI Budget) ÷ |Prorated NOI Budget| × 100", source: "Computed using prorated budget for MTD periods" },
+      { name: "Revenue vs Budget", formula: "Revenue − Full-Month Budget", source: "Never prorated — most revenue is contractual and posts in full on the 1st, so MTD actuals are always compared to the full-month target" },
+      { name: "Net Income vs Budget %", formula: "(MTD NI − Prorated NI Budget) ÷ |Prorated NI Budget| × 100", source: "Computed using prorated budget for MTD periods. NI budget is pulled from Yardi's own Net Income total row (account 9900)." },
     ],
   },
   {
     title: "Health Badges",
     metrics: [
-      { name: "Green — On Pace", formula: "NOI is within 10% of prorated budget (i.e., NOI actual ≥ NOI budget × pacing × 0.90)", source: "Computed in DashboardClient" },
-      { name: "Yellow — At Risk", formula: "NOI is 10–25% below prorated budget", source: "Computed in DashboardClient" },
-      { name: "Red — Off Track", formula: "NOI is more than 25% below prorated budget", source: "Computed in DashboardClient" },
+      { name: "Green — On Pace", formula: "Net Income is within 10% of prorated budget (i.e., NI actual ≥ NI budget × pacing × 0.90)", source: "Computed in DashboardClient" },
+      { name: "Yellow — At Risk", formula: "Net Income is 10–25% below prorated budget", source: "Computed in DashboardClient" },
+      { name: "Red — Off Track", formula: "Net Income is more than 25% below prorated budget", source: "Computed in DashboardClient" },
     ],
   },
   {

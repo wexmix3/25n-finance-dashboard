@@ -48,7 +48,7 @@ export function LocationTabs({ active, onChange, flagCounts, healthStatuses }: P
           >
             {health && (
               <span
-                title={`NOI vs budget: ${health === "green" ? "on track (within 10%)" : health === "yellow" ? "at risk (10–25% miss)" : "off track (>25% miss)"}`}
+                title={`Net Income vs budget: ${health === "green" ? "on track (within 10%)" : health === "yellow" ? "at risk (10–25% miss)" : "off track (>25% miss)"}`}
                 className={`w-2 h-2 rounded-full flex-shrink-0 ${
                   health === "green" ? "bg-emerald-500" :
                   health === "yellow" ? "bg-amber-400" : "bg-red-500"
@@ -74,7 +74,7 @@ export function LocationTabs({ active, onChange, flagCounts, healthStatuses }: P
         {/* Health legend — inline right */}
         {hasHealth && (
           <div className="hidden sm:flex items-center gap-2 border border-gray-200 rounded px-2 py-1 flex-shrink-0 mb-1 mr-1">
-            <span className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider pr-1 border-r border-gray-200">NOI</span>
+            <span className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider pr-1 border-r border-gray-200">NI</span>
             <div className="flex items-center gap-1 text-[11px] text-gray-500">
               <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 inline-block flex-shrink-0" />On pace
             </div>

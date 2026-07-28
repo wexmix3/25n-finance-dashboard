@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState, useSyncExternalStore } from "react";
 import { useRouter } from "next/navigation";
 import { createBrowserSupabaseClient } from "@/lib/supabase/browser";
 import { LOCATIONS, Location } from "@/types/dashboard";
@@ -107,13 +107,6 @@ export function DashboardClient({ locationData, packetData, userEmail, role }: P
   const [reviewOverrides, setReviewOverrides] = useState<Record<string, boolean>>({});
   const router = useRouter();
 
-  // "Days stale" is a function of wall-clock now, not of the data — computing
-  // it at render time makes the SSR pass and the hydration pass disagree
-  // (the two happen seconds to minutes apart). Only compute after mount so
-  // the first client render matches what the server sent.
-  const [mounted, setMounted] = useState(false);
-  useEffect(() => setMounted(true), []);
-
   const locData = locationData[activeLocation];
 
   const selectedMonth = selectedMonths[activeLocation] ?? null;
@@ -170,7 +163,7 @@ export function DashboardClient({ locationData, packetData, userEmail, role }: P
   const trendEndMonth = selectedMonth ?? locData.availableMonths[0] ?? "";
   const periodTrend = trendEndMonth ? buildPeriodTrend(locData.allRecords, trendEndMonth) : locData.trend;
 
-  // Health badges — prorated NOI vs budget per location
+  // Health badges — prorated Net Income vs budget per location
   const flagCounts: Partial<Record<Location, number>> = {};
   const healthStatuses: Partial<Record<Location, HealthStatus>> = {};
 
@@ -183,14 +176,14 @@ export function DashboardClient({ locationData, packetData, userEmail, role }: P
     if (totalIssues > 0 && !isReviewed) {
       flagCounts[loc] = totalIssues;
     }
-    const noi = d?.income_statement?.net_operating_income;
+    const ni = d?.income_statement?.net_income;
     const c = locationData[loc].current;
-    if (noi && noi.budget !== undefined && noi.budget !== 0 && c?.uploaded_at && c?.month) {
+    if (ni && ni.budget !== undefined && ni.budget !== 0 && c?.uploaded_at && c?.month) {
       const locPacing = computeLocPacingPct(c.month, c.uploaded_at);
       if (locPacing !== null) {
-        const proratedBudget = noi.budget * locPacing;
+        const proratedBudget = ni.budget * locPacing;
         if (Math.abs(proratedBudget) > 100) {
-          const pct = (noi.actual - proratedBudget) / Math.abs(proratedBudget);
+          const pct = (ni.actual - proratedBudget) / Math.abs(proratedBudget);
           if (pct >= -0.10) healthStatuses[loc] = "green";
           else if (pct >= -0.25) healthStatuses[loc] = "yellow";
           else healthStatuses[loc] = "red";
@@ -199,9 +192,18 @@ export function DashboardClient({ locationData, packetData, userEmail, role }: P
     }
   }
 
-  const daysStale = mounted && uploadedAt
-    ? Math.floor((Date.now() - new Date(uploadedAt).getTime()) / 86400000)
-    : null;
+  // Date.now() is impure, so it's read via useSyncExternalStore rather than
+  // directly in the render body — server snapshot is null (SSR has no
+  // reliable "now"), client snapshot computes the real elapsed days.
+  // useSyncExternalStore's getSnapshot is the React-sanctioned place to read
+  // impure/external state (wall-clock time); the linter doesn't special-case
+  // this hook, so the impure call is suppressed on the line itself below.
+  const daysStale = useSyncExternalStore(
+    () => () => {},
+    // eslint-disable-next-line react-hooks/purity
+    () => (uploadedAt ? Math.floor((Date.now() - new Date(uploadedAt).getTime()) / 86400000) : null),
+    () => null
+  );
   const isStale = daysStale !== null && daysStale > 14;
 
   const activeMonth = selectedMonth ?? locData.availableMonths[0];

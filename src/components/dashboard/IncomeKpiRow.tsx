@@ -65,38 +65,38 @@ interface Props {
 export function IncomeKpiRow({ current, prior, runRateFactor, pacingPct }: Props) {
   const is = current.income_statement;
   const rev = is.revenue._total.actual;
-  const noi = is.net_operating_income.actual;
   const ni = is.net_income.actual;
   const netMargin = is.net_income.margin_pct;
   const budgetRev = is.revenue._total.budget;
-  const budgetNoi = is.net_operating_income.budget;
+  const budgetNi = is.net_income.budget;
 
   // Only show MoM% for closed periods — MTD vs prior full month is misleading
   const isPartial = pacingPct !== null && pacingPct !== undefined && pacingPct < 1;
   const revDelta = !isPartial && prior ? momDelta(rev, prior.income_statement.revenue._total.actual) : null;
-  const noiDelta = !isPartial && prior ? momDelta(noi, prior.income_statement.net_operating_income.actual) : null;
   const niDelta = !isPartial && prior ? momDelta(ni, prior.income_statement.net_income.actual) : null;
   const netMarginDelta = !isPartial && prior
     ? { diff: netMargin - prior.income_statement.net_income.margin_pct, positive: netMargin >= prior.income_statement.net_income.margin_pct }
     : null;
 
-  // Prorate budget comparison for partial months
+  // Prorate budget comparison for partial months (Net Income only — Revenue is
+  // mostly contractual and posts in full on the 1st, so prorating its budget
+  // manufactures a fake shortfall/surplus signal for most of the month. NI
+  // includes OPEX, which does accrue through the month, so proration still holds.)
   const effectivePacing = pacingPct ?? 1;
-  const proratedRevBudget = budgetRev * effectivePacing;
-  const proratedNoiBudget = budgetNoi * effectivePacing;
+  const proratedNiBudget = budgetNi * effectivePacing;
 
   // Below this budget magnitude, a % variance explodes into noise (e.g. a $777
   // miss on a $63 budget reads as +1200%) — show the absolute dollar miss
   // instead once the denominator gets too small to carry a meaningful ratio.
   const PCT_DENOMINATOR_FLOOR = 2000;
-  const vsBudgetRev = Math.abs(proratedRevBudget) >= PCT_DENOMINATOR_FLOOR
-    ? ((rev - proratedRevBudget) / Math.abs(proratedRevBudget)) * 100
+  const revBudgetVariance = rev - budgetRev;
+  const vsBudgetRevPct = Math.abs(budgetRev) >= PCT_DENOMINATOR_FLOOR
+    ? (revBudgetVariance / Math.abs(budgetRev)) * 100
     : null;
-  const vsBudgetNoi = Math.abs(proratedNoiBudget) >= PCT_DENOMINATOR_FLOOR
-    ? ((noi - proratedNoiBudget) / Math.abs(proratedNoiBudget)) * 100
+  const vsBudgetNi = Math.abs(proratedNiBudget) >= PCT_DENOMINATOR_FLOOR
+    ? ((ni - proratedNiBudget) / Math.abs(proratedNiBudget)) * 100
     : null;
-  const noiMissTooSmallForPct = Math.abs(proratedNoiBudget) < PCT_DENOMINATOR_FLOOR && proratedNoiBudget !== 0;
-  const revMissTooSmallForPct = Math.abs(proratedRevBudget) < PCT_DENOMINATOR_FLOOR && proratedRevBudget !== 0;
+  const niMissTooSmallForPct = Math.abs(proratedNiBudget) < PCT_DENOMINATOR_FLOOR && proratedNiBudget !== 0;
 
   // Revenue run-rate only — OPEX is fixed-cost so NOI projection math is invalid
   const projRev = runRateFactor ? `→ ${fmt(rev * runRateFactor)} est. full-mo.` : undefined;
@@ -107,7 +107,7 @@ export function IncomeKpiRow({ current, prior, runRateFactor, pacingPct }: Props
     <div className="flex flex-col gap-3 lg:flex-row lg:items-stretch">
     <div className="flex-1">
       <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider mb-1.5 px-0.5">This period vs. last</p>
-      <div className="grid grid-cols-2 gap-3 md:grid-cols-4 h-[calc(100%-1.375rem)]">
+      <div className="grid grid-cols-2 gap-3 md:grid-cols-3 h-[calc(100%-1.375rem)]">
       <KpiCard
         label="Revenue"
         value={fmt(rev)}
@@ -124,15 +124,6 @@ export function IncomeKpiRow({ current, prior, runRateFactor, pacingPct }: Props
         sub={netMarginDelta ? `${netMarginDelta.diff >= 0 ? "+" : ""}${netMarginDelta.diff.toFixed(1)}pp MoM` : mtdLabel}
         subPositive={netMarginDelta ? netMarginDelta.positive : netMargin >= 0}
         info={{ title: "Net Margin", formula: "Net Income ÷ Total Revenue", source: "Yardi Scheduler_Reports", note: "The bottom-line profitability rate — what share of every revenue dollar the location actually keeps after all expenses." }}
-      />
-      <KpiCard
-        label="NOI"
-        value={fmt(noi)}
-        valueNegative={noi < 0}
-        sub={noiDelta?.label ?? mtdLabel}
-        subPositive={noiDelta?.positive}
-        projection={`${is.net_operating_income.margin_pct.toFixed(1)}% operating margin`}
-        info={{ title: "Net Operating Income (NOI)", formula: "Gross Profit − Total Operating Expenses", source: "Yardi Scheduler_Reports", note: "Operating Margin = NOI ÷ Revenue. Primary profitability metric for coworking — positive NOI means the location covers all operating costs from its own revenue." }}
       />
       <KpiCard
         label="Net Income"
@@ -152,31 +143,25 @@ export function IncomeKpiRow({ current, prior, runRateFactor, pacingPct }: Props
       <div className="grid grid-cols-2 gap-3 h-[calc(100%-1.375rem)]">
       <KpiCard
         label="Revenue vs Budget"
-        value={
-          vsBudgetRev !== null
-            ? `${vsBudgetRev >= 0 ? "+" : ""}${vsBudgetRev.toFixed(1)}%`
-            : revMissTooSmallForPct
-            ? fmt(rev - proratedRevBudget)
-            : "—"
-        }
-        sub={revMissTooSmallForPct ? "budget too small for a % — showing $ miss" : budgetNote}
-        subPositive={vsBudgetRev !== null ? vsBudgetRev >= 0 : revMissTooSmallForPct ? rev >= proratedRevBudget : undefined}
+        value={`${revBudgetVariance >= 0 ? "+" : "-"}${fmt(Math.abs(revBudgetVariance))}`}
+        sub={vsBudgetRevPct !== null ? `${vsBudgetRevPct >= 0 ? "+" : ""}${vsBudgetRevPct.toFixed(1)}% of budget` : "vs full-month budget"}
+        subPositive={revBudgetVariance >= 0}
         highlight
-        info={{ title: "Revenue vs Budget", formula: isPartial ? `(MTD Revenue − Budget × ${Math.round(effectivePacing * 100)}%) ÷ |Prorated Budget|` : "(Revenue − Full-Month Budget) ÷ |Budget|", source: "Budget from Yardi Budget Comparison export", note: `${isPartial ? "Budget is prorated to match elapsed days so Day-8 actuals aren't compared to a full-month target. " : ""}Below a $${PCT_DENOMINATOR_FLOOR.toLocaleString()} budget, the % swings wildly, so the $ miss is shown instead.` }}
+        info={{ title: "Revenue vs Budget", formula: "Revenue − Full-Month Budget", source: "Budget from Yardi Budget Comparison export", note: "Most 25N revenue is contractual and posts in full on the 1st, so this is always compared to the full-month budget — never prorated by elapsed days — and shown as a $ variance." }}
       />
       <KpiCard
-        label="NOI vs Budget"
+        label="Net Income vs Budget"
         value={
-          vsBudgetNoi !== null
-            ? `${vsBudgetNoi >= 0 ? "+" : ""}${vsBudgetNoi.toFixed(1)}%`
-            : noiMissTooSmallForPct
-            ? fmt(noi - proratedNoiBudget)
+          vsBudgetNi !== null
+            ? `${vsBudgetNi >= 0 ? "+" : ""}${vsBudgetNi.toFixed(1)}%`
+            : niMissTooSmallForPct
+            ? fmt(ni - proratedNiBudget)
             : "—"
         }
-        sub={noiMissTooSmallForPct ? "budget too small for a % — showing $ miss" : budgetNote}
-        subPositive={vsBudgetNoi !== null ? vsBudgetNoi >= 0 : noiMissTooSmallForPct ? noi >= proratedNoiBudget : undefined}
+        sub={niMissTooSmallForPct ? "budget too small for a % — showing $ miss" : budgetNote}
+        subPositive={vsBudgetNi !== null ? vsBudgetNi >= 0 : niMissTooSmallForPct ? ni >= proratedNiBudget : undefined}
         highlight
-        info={{ title: "NOI vs Budget", formula: isPartial ? `(MTD NOI − NOI Budget × ${Math.round(effectivePacing * 100)}%) ÷ |Prorated NOI Budget|` : "(NOI − Full-Month NOI Budget) ÷ |NOI Budget|", source: "NOI budget from Yardi Budget Comparison export", note: `Key signal for whether the location is on track for its profitability target. Below a $${PCT_DENOMINATOR_FLOOR.toLocaleString()} budget, the % swings wildly (a small-dollar miss reads as +1000%+), so the $ miss is shown instead.` }}
+        info={{ title: "Net Income vs Budget", formula: isPartial ? `(MTD NI − NI Budget × ${Math.round(effectivePacing * 100)}%) ÷ |Prorated NI Budget|` : "(NI − Full-Month NI Budget) ÷ |NI Budget|", source: "NI budget from Yardi Budget Comparison export (account 9900)", note: `Primary profitability-vs-plan signal now that NOI is no longer shown separately. Below a $${PCT_DENOMINATOR_FLOOR.toLocaleString()} budget, the % swings wildly (a small-dollar miss reads as +1000%+), so the $ miss is shown instead.` }}
       />
       </div>
     </div>

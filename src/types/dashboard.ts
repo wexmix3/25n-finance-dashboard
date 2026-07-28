@@ -18,6 +18,8 @@ export interface NOI extends LineItem {
 
 export interface NetIncome {
   actual: number;
+  budget: number;
+  variance: number;
   margin_pct: number;
 }
 

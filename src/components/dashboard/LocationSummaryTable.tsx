@@ -13,7 +13,7 @@ function fmt(n: number): string {
 }
 
 
-function computeYTD(records: MonthlyRecord[], currentMonth: string): { revenue: number; noi: number } | null {
+function computeYTD(records: MonthlyRecord[], currentMonth: string): { revenue: number; ni: number } | null {
   const [, yearStr] = currentMonth.split(" ");
   if (!yearStr) return null;
   const ytd = records.filter(r => r.month.endsWith(yearStr));
@@ -21,9 +21,9 @@ function computeYTD(records: MonthlyRecord[], currentMonth: string): { revenue: 
   return ytd.reduce(
     (acc, r) => ({
       revenue: acc.revenue + (r.data?.income_statement?.revenue?._total?.actual ?? 0),
-      noi: acc.noi + (r.data?.income_statement?.net_operating_income?.actual ?? 0),
+      ni: acc.ni + (r.data?.income_statement?.net_income?.actual ?? 0),
     }),
-    { revenue: 0, noi: 0 }
+    { revenue: 0, ni: 0 }
   );
 }
 
@@ -54,13 +54,13 @@ const metrics: {
   },
   {
     label: "Revenue vs Budget",
-    info: { title: "Revenue vs Budget (full-month)", formula: "(MTD Revenue − Full-Month Budget) ÷ |Full Budget|", note: "Uses the full-month budget as denominator — not prorated. The KPI card above prorates to elapsed days; this row shows the raw gap from plan." },
+    info: { title: "Revenue vs Budget (full-month)", formula: "Revenue − Full-Month Budget", note: "Always compared to the full-month budget, never prorated — most revenue is contractual and posts in full on the 1st." },
     getValue: d => {
       const rev = d.income_statement.revenue._total.actual;
       const bud = d.income_statement.revenue._total.budget;
       if (!bud) return { text: "—" };
-      const pct = ((rev - bud) / Math.abs(bud)) * 100;
-      return { text: `${pct >= 0 ? "+" : ""}${pct.toFixed(1)}%` };
+      const diff = rev - bud;
+      return { text: `${diff >= 0 ? "+" : "-"}${fmt(Math.abs(diff))}`, color: diff >= 0 ? "text-emerald-600" : "text-red-500" };
     },
   },
   {
@@ -74,27 +74,6 @@ const metrics: {
     getValue: d => ({ text: fmt(d.income_statement.opex._total.actual) }),
   },
   {
-    label: "NOI",
-    bold: true,
-    separator: true,
-    info: { title: "Net Operating Income (NOI)", formula: "Gross Profit − Total OPEX", source: "Computed by build_statements.py", note: "Positive = location is self-sustaining. Negative = location requires subsidy from other locations or corporate." },
-    getValue: d => {
-      const noi = d.income_statement.net_operating_income.actual;
-      return { text: fmt(noi), color: noi >= 0 ? "text-emerald-600" : "text-red-500" };
-    },
-  },
-  {
-    label: "NOI vs Budget",
-    info: { title: "NOI vs Budget (full-month)", formula: "(MTD NOI − Full-Month NOI Budget) ÷ |Full NOI Budget|", note: "Uses the full-month NOI budget — not prorated. The KPI card above prorates to elapsed days; this row shows the raw gap from plan." },
-    getValue: d => {
-      const noi = d.income_statement.net_operating_income.actual;
-      const bud = d.income_statement.net_operating_income.budget;
-      if (!bud) return { text: "—" };
-      const diff = ((noi - bud) / Math.abs(bud)) * 100;
-      return { text: `${diff >= 0 ? "+" : ""}${diff.toFixed(1)}%` };
-    },
-  },
-  {
     label: "Net Income",
     bold: true,
     separator: true,
@@ -102,6 +81,17 @@ const metrics: {
     getValue: d => {
       const ni = d.income_statement.net_income.actual;
       return { text: fmt(ni), color: ni >= 0 ? "text-emerald-600" : "text-red-500" };
+    },
+  },
+  {
+    label: "Net Income vs Budget",
+    info: { title: "Net Income vs Budget (full-month)", formula: "(MTD NI − Full-Month NI Budget) ÷ |Full NI Budget|", note: "Uses the full-month NI budget — not prorated. The KPI card above prorates to elapsed days; this row shows the raw gap from plan." },
+    getValue: d => {
+      const ni = d.income_statement.net_income.actual;
+      const bud = d.income_statement.net_income.budget;
+      if (!bud) return { text: "—" };
+      const diff = ((ni - bud) / Math.abs(bud)) * 100;
+      return { text: `${diff >= 0 ? "+" : ""}${diff.toFixed(1)}%` };
     },
   },
   {
@@ -115,13 +105,13 @@ const metrics: {
     },
   },
   {
-    label: "YTD NOI",
+    label: "YTD Net Income",
     bold: false,
-    info: { title: "Year-to-Date NOI", formula: "Sum of NOI across all months in the current calendar year", source: "Computed from monthly_financials records in Supabase", note: "YTD NOI accumulates — a single bad month reduces the YTD figure permanently." },
+    info: { title: "Year-to-Date Net Income", formula: "Sum of Net Income across all months in the current calendar year", source: "Computed from monthly_financials records in Supabase", note: "YTD Net Income accumulates — a single bad month reduces the YTD figure permanently." },
     getValue: (_d, records, currentMonth) => {
       const ytd = computeYTD(records, currentMonth);
       if (!ytd) return { text: "—" };
-      return { text: fmt(ytd.noi), color: ytd.noi >= 0 ? "text-emerald-600" : "text-red-500" };
+      return { text: fmt(ytd.ni), color: ytd.ni >= 0 ? "text-emerald-600" : "text-red-500" };
     },
   },
 ];
