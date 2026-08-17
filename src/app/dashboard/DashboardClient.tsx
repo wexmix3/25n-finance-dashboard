@@ -31,6 +31,7 @@ interface LocationData {
   allRecords: MonthlyRecord[];
   availableMonths: string[];
   allOccupancy: { month: string; data: OccupancyData }[];
+  occupancyUploadedAt: string | null;
 }
 
 interface Props {
@@ -205,6 +206,23 @@ export function DashboardClient({ locationData, packetData, userEmail, role }: P
     () => null
   );
   const isStale = daysStale !== null && daysStale > 14;
+
+  // Occupancy has no manual-upload fallback anymore (the Kube API pull
+  // replaced it 2026-08) — this is the safety net in its place: if today's
+  // calendar-month occupancy row hasn't landed or is over 48h old, the
+  // daily automation likely broke silently and needs a look.
+  const occupancyUploadedAt = locData.occupancyUploadedAt;
+  const occHoursStale = useSyncExternalStore(
+    () => () => {},
+     
+    () => (occupancyUploadedAt ? Math.floor((Date.now() - new Date(occupancyUploadedAt).getTime()) / 3600000) : null),
+    () => null
+  );
+  // Missing row is a pure prop check (safe pre-hydration, no flash); "too
+  // old" needs the impure clock read above, so it only applies once
+  // hydrated — same asymmetry as the financial isStale check above.
+  const isOccupancyMissing = !occupancyUploadedAt;
+  const isOccupancyStale = isOccupancyMissing || (occHoursStale !== null && occHoursStale > 48);
 
   const activeMonth = selectedMonth ?? locData.availableMonths[0];
 
@@ -393,7 +411,21 @@ export function DashboardClient({ locationData, packetData, userEmail, role }: P
 
         {/* Occupancy view */}
         {activeView === "occupancy" && (
-          <OccupancySection current={occupancy} prior={priorOccupancy} expectedMonth={currentMonth !== "—" ? currentMonth : undefined} />
+          <>
+            {isOccupancyStale && (
+              <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-2.5 flex items-center gap-2.5 mb-4">
+                <svg className="w-4 h-4 text-amber-500 flex-shrink-0" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126ZM12 15.75h.007v.008H12v-.008Z" />
+                </svg>
+                <span className="text-xs text-amber-800 font-medium">
+                  {isOccupancyMissing
+                    ? "No occupancy data yet for the current month — the daily Kube pull may not have run."
+                    : `Occupancy last updated ${occHoursStale}h ago — the daily Kube pull may have stopped running.`}
+                </span>
+              </div>
+            )}
+            <OccupancySection current={occupancy} prior={priorOccupancy} expectedMonth={currentMonth !== "—" ? currentMonth : undefined} />
+          </>
         )}
 
         {/* Overview view */}

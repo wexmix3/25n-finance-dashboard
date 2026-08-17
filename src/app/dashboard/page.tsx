@@ -43,10 +43,18 @@ export default async function DashboardPage() {
 
   const { data: occupancyRecordsRaw } = await db
     .from("monthly_occupancy")
-    .select("location, month, data");
+    .select("location, month, data, uploaded_at");
   const occupancyRecords = [...(occupancyRecordsRaw ?? [])].sort(
     (a: { month: string }, b: { month: string }) => monthSortKey(b.month) - monthSortKey(a.month)
   );
+
+  // "Is the daily Kube pull actually still running" is a different question
+  // from "how old is the month being displayed" (the latter is expected to
+  // be old when someone's intentionally browsing history). This checks the
+  // freshness of THIS calendar month's occupancy row specifically, since
+  // that's the one the daily automation is supposed to be touching today.
+  const now = new Date();
+  const currentCalendarMonth = `${MONTH_NAMES[now.getMonth()]} ${now.getFullYear()}`;
 
   const { data: packetRecords } = await db
     .from("monthly_packets")
@@ -62,6 +70,7 @@ export default async function DashboardPage() {
     allRecords: MonthlyRecord[];
     availableMonths: string[];
     allOccupancy: { month: string; data: OccupancyData }[];
+    occupancyUploadedAt: string | null;
   };
 
   const locationData: Record<Location, LocationData> = {} as Record<Location, LocationData>;
@@ -85,6 +94,9 @@ export default async function DashboardPage() {
 
     const locOccupancy = (occupancyRecords ?? []).filter((r: { location: string }) => r.location === loc);
     const occupancy: OccupancyData | null = locOccupancy[0]?.data ?? null;
+    const occupancyUploadedAt: string | null =
+      locOccupancy.find((r: { month: string; uploaded_at?: string }) => r.month === currentCalendarMonth)
+        ?.uploaded_at ?? null;
     const priorOccMonth = occupancy?.month ? getPriorMonth(occupancy.month) : null;
     const priorOccupancy: OccupancyData | null = priorOccMonth
       ? (locOccupancy.find((r: { month: string }) => r.month === priorOccMonth)?.data ?? null)
@@ -102,6 +114,7 @@ export default async function DashboardPage() {
         month: r.month,
         data: r.data,
       })),
+      occupancyUploadedAt,
     };
   }
 
