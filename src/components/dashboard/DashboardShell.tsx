@@ -22,8 +22,6 @@ interface Props {
  * border + bold white text, inactive items sit at ~70% white opacity.
  */
 export function DashboardShell({ active, onChange, flagCounts, healthStatuses, children }: Props) {
-  const hasHealth = LOCATIONS.some(l => healthStatuses?.[l]);
-
   return (
     <div className="min-h-screen flex bg-gray-50">
       <aside className="w-60 flex-shrink-0 bg-[#1F3642] flex flex-col">
@@ -52,23 +50,6 @@ export function DashboardShell({ active, onChange, flagCounts, healthStatuses, c
             />
           ))}
         </nav>
-
-        {hasHealth && (
-          <div className="px-4 py-4 border-t border-white/10">
-            <p className="text-[10px] font-semibold text-white/40 uppercase tracking-wider mb-2">Net Income vs Budget</p>
-            <div className="space-y-1.5">
-              <div className="flex items-center gap-1.5 text-[11px] text-white/60">
-                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 inline-block flex-shrink-0" />On pace
-              </div>
-              <div className="flex items-center gap-1.5 text-[11px] text-white/60">
-                <span className="w-1.5 h-1.5 rounded-full bg-amber-400 inline-block flex-shrink-0" />At risk
-              </div>
-              <div className="flex items-center gap-1.5 text-[11px] text-white/60">
-                <span className="w-1.5 h-1.5 rounded-full bg-red-400 inline-block flex-shrink-0" />Off track
-              </div>
-            </div>
-          </div>
-        )}
       </aside>
 
       <div className="flex-1 min-w-0 flex flex-col">{children}</div>

@@ -44,3 +44,18 @@ export function formatCurrency(n: number, opts: FormatCurrencyOptions = {}): str
 export function formatSignedPct(n: number, digits = 1): string {
   return `${n >= 0 ? "+" : ""}${n.toFixed(digits)}%`;
 }
+
+/** Below this revenue magnitude, a margin % (X ÷ revenue) explodes into
+ * noise — e.g. a location with ~$10 of revenue against $20K+ OPEX prints
+ * Net Margin as -214548.9%, which reads as broken rather than "real math on
+ * a tiny number." Same guard pattern as IncomeKpiRow's PCT_DENOMINATOR_FLOOR
+ * for budget variance, but keyed on revenue since margin = X ÷ revenue. */
+export const MARGIN_REVENUE_FLOOR = 2000;
+
+/** Format a margin percentage, falling back to a low-revenue notice instead
+ * of a six-digit percent when revenue is too small to carry a meaningful
+ * ratio. `digits` controls precision when the percent is shown. */
+export function formatMarginPct(marginPct: number, revenue: number, digits = 1): string {
+  if (Math.abs(revenue) < MARGIN_REVENUE_FLOOR) return "N/A · low revenue";
+  return `${marginPct.toFixed(digits)}%`;
+}

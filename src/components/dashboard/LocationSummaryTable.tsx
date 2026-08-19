@@ -3,7 +3,7 @@
 import type { FinancialData, MonthlyRecord } from "@/types/dashboard";
 import { LOCATIONS, Location } from "@/types/dashboard";
 import { InfoPopover } from "@/components/ui/InfoPopover";
-import { formatCurrency } from "@/lib/formatCurrency";
+import { formatCurrency, formatMarginPct } from "@/lib/formatCurrency";
 
 function fmt(n: number): string {
   return formatCurrency(n, { compact: true });
@@ -62,8 +62,8 @@ const metrics: {
   },
   {
     label: "GP Margin %",
-    info: { title: "Gross Profit Margin", formula: "Gross Profit ÷ Total Revenue × 100", source: "Computed by build_statements.py" },
-    getValue: d => ({ text: `${d.income_statement.gross_profit.margin_pct.toFixed(1)}%` }),
+    info: { title: "Gross Profit Margin", formula: "Gross Profit ÷ Total Revenue × 100", source: "Computed by build_statements.py", note: "Below a low-revenue floor, the % swings wildly (e.g. real math on ~$10 of revenue against $20K+ OPEX reads as a six-digit percent), so a low-revenue notice is shown instead." },
+    getValue: d => ({ text: formatMarginPct(d.income_statement.gross_profit.margin_pct, d.income_statement.revenue._total.actual) }),
   },
   {
     label: "Total OPEX",

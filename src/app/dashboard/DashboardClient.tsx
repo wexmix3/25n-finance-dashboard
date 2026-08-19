@@ -17,8 +17,9 @@ import { VariancePanel } from "@/components/dashboard/VariancePanel";
 import { LocationSummaryTable } from "@/components/dashboard/LocationSummaryTable";
 import { DataDictionary } from "@/components/dashboard/DataDictionary";
 import { GLCheckTab } from "@/components/dashboard/GLCheckTab";
+import { AlertBannerStack, AlertBanner, type AlertBannerItem } from "@/components/dashboard/AlertBanner";
 import { FinancialPacketTab } from "@/components/dashboard/FinancialPacketTab";
-import { formatCurrency } from "@/lib/formatCurrency";
+import { formatCurrency, formatMarginPct, MARGIN_REVENUE_FLOOR } from "@/lib/formatCurrency";
 
 type HealthStatus = "green" | "yellow" | "red";
 
@@ -66,6 +67,20 @@ function getPriorMonthLabel(month: string): string {
   if (idx === -1 || !yearStr) return "Prior";
   if (idx === 0) return `Dec ${year - 1}`;
   return `${monthNames[idx - 1]} ${year}`;
+}
+
+/** Last 6 months of occupancy % ending at the current financial month —
+ * same allOccupancy source LocationData already carries, just sliced/mapped
+ * for the Occupancy tab's trend chart (finding #7: the tab was mostly empty
+ * space below the single stat card). */
+function buildOccupancyHistory(
+  allOccupancy: { month: string; data: import("@/types/dashboard").OccupancyData }[],
+  endMonth: string
+): { month: string; occupancy_pct: number | null }[] {
+  const sorted = [...allOccupancy].sort((a, b) => monthSortKeyLocal(a.month) - monthSortKeyLocal(b.month));
+  const endIdx = sorted.findIndex(o => o.month === endMonth);
+  const upto = endIdx >= 0 ? sorted.slice(0, endIdx + 1) : sorted;
+  return upto.slice(-6).map(o => ({ month: o.month, occupancy_pct: o.data.occupancy_pct ?? null }));
 }
 
 function buildPeriodTrend(allRecords: MonthlyRecord[], endMonth: string): TrendPoint[] {
@@ -341,7 +356,6 @@ export function DashboardClient({ locationData, packetData, userEmail, role }: P
         {isConsolidated ? (() => {
           const portfolio = computePortfolioSnapshot(locationData);
           const portfolioTrend = computePortfolioTrend(locationData);
-          const niVsBudget = portfolio.ni - portfolio.niBudget;
           const onPace = LOCATIONS.filter(l => healthStatuses[l] === "green").length;
           const atRisk = LOCATIONS.filter(l => healthStatuses[l] === "yellow").map(l => l);
           const offTrack = LOCATIONS.filter(l => healthStatuses[l] === "red").map(l => l);
@@ -364,13 +378,6 @@ export function DashboardClient({ locationData, packetData, userEmail, role }: P
                 <p className={`text-6xl font-bold tracking-tight tabular-nums ${portfolio.ni < 0 ? "text-red-600" : "text-gray-900"}`}>
                   {fmtExec(portfolio.ni)}
                 </p>
-              </div>
-
-              {/* Secondary stats — plain inline row, no individual cards */}
-              <div className="flex flex-wrap items-baseline gap-x-8 gap-y-2 py-3 border-y border-gray-200">
-                <div><span className="text-xs text-gray-400">Revenue: </span><span className="text-sm font-semibold text-gray-800 tabular-nums">{fmtExec(portfolio.revenue)}</span></div>
-                <div><span className="text-xs text-gray-400">Net Income vs Budget: </span><span className={`text-sm font-semibold tabular-nums ${niVsBudget >= 0 ? "text-emerald-600" : "text-red-600"}`}>{formatCurrency(niVsBudget, { compact: true, showSign: true })}</span></div>
-                <div><span className="text-xs text-gray-400">Locations reporting: </span><span className="text-sm font-semibold text-gray-800 tabular-nums">{portfolio.locationsWithData} of {LOCATIONS.length}</span></div>
               </div>
 
               {portfolioTrend.length > 0 && (
@@ -452,18 +459,6 @@ export function DashboardClient({ locationData, packetData, userEmail, role }: P
           })}
         </div>
 
-        {/* Stale data warning */}
-        {isStale && activeView === "overview" && (
-          <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-2.5 flex items-center gap-2.5">
-            <svg className="w-4 h-4 text-amber-500 flex-shrink-0" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126ZM12 15.75h.007v.008H12v-.008Z" />
-            </svg>
-            <span className="text-xs text-amber-800 font-medium">
-              Data last updated {daysStale} days ago — verify this reflects the current close period.
-            </span>
-          </div>
-        )}
-
         {/* Period banner — only when there's a real period to show. With zero
             records (e.g. a location before its first upload), currentMonth
             falls back to "—" and priorMonth to "Prior", which rendered a
@@ -491,6 +486,7 @@ export function DashboardClient({ locationData, packetData, userEmail, role }: P
               onReviewChange={(reviewed) =>
                 setReviewOverrides(prev => ({ ...prev, [`${activeLocation}|${current.month}`]: reviewed }))
               }
+              role={role}
             />
           ) : (
             <NoLocationData location={activeLocation} detail="GL data for this location hasn't been uploaded yet." />
@@ -513,18 +509,21 @@ export function DashboardClient({ locationData, packetData, userEmail, role }: P
         {activeView === "occupancy" && (
           <>
             {isOccupancyStale && (
-              <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-2.5 flex items-center gap-2.5 mb-4">
-                <svg className="w-4 h-4 text-amber-500 flex-shrink-0" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126ZM12 15.75h.007v.008H12v-.008Z" />
-                </svg>
-                <span className="text-xs text-amber-800 font-medium">
-                  {isOccupancyMissing
+              <AlertBanner
+                className="mb-4"
+                message={
+                  isOccupancyMissing
                     ? "No occupancy data yet for the current month — the daily Kube pull may not have run."
-                    : `Occupancy last updated ${occHoursStale}h ago — the daily Kube pull may have stopped running.`}
-                </span>
-              </div>
+                    : `Occupancy last updated ${occHoursStale}h ago — the daily Kube pull may have stopped running.`
+                }
+              />
             )}
-            <OccupancySection current={occupancy} prior={priorOccupancy} expectedMonth={currentMonth !== "—" ? currentMonth : undefined} />
+            <OccupancySection
+              current={occupancy}
+              prior={priorOccupancy}
+              expectedMonth={currentMonth !== "—" ? currentMonth : undefined}
+              history={currentMonth !== "—" ? buildOccupancyHistory(locData.allOccupancy, currentMonth) : undefined}
+            />
           </>
         )}
 
@@ -538,78 +537,90 @@ export function DashboardClient({ locationData, packetData, userEmail, role }: P
           const heroInsight = currentData.insights?.[0];
           const heroDetail = currentData.insights?.[1];
           return (
-            <>
-              <InsightPanel
-                insight={heroInsight ?? `Net Income for ${currentMonth}`}
-                detail={heroDetail}
-                actionLabel="View GL Check →"
-                onAction={() => setActiveView("gl")}
-              />
+            // Two-column desktop layout (finding #11): left = insight/hero/
+            // trend, right = KPI row/variance, P&L stays full-width below
+            // both. Grid-template-areas so the DOM order can still define a
+            // sensible single-column mobile reading order (insight → hero →
+            // KPI → trend → P&L → variance) independent of the desktop
+            // column split — a plain flex/order approach can't place items
+            // into two aligned columns and still control mobile order
+            // separately, template-areas can.
+            <div
+              className={[
+                "grid grid-cols-1 gap-5 lg:grid-cols-2 lg:gap-x-8 lg:gap-y-5 lg:items-start",
+                "[grid-template-areas:'insight'_'hero'_'kpi'_'trend'_'pltable'_'variance']",
+                "lg:[grid-template-areas:'insight_insight'_'hero_kpi'_'trend_variance'_'pltable_pltable']",
+              ].join(" ")}
+            >
+              <div className="[grid-area:insight] space-y-2.5">
+                <InsightPanel
+                  insight={heroInsight ?? `Net Income for ${currentMonth}`}
+                  detail={heroDetail}
+                  actionLabel="View GL Check →"
+                  onAction={() => setActiveView("gl")}
+                />
 
-              {/* Recon flag — surfaced as a banner, not buried in KPI grid */}
-              {reconNotes.length > 0 && (
-                <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-2.5 flex items-start gap-2.5">
-                  <svg className="w-4 h-4 text-amber-500 flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126ZM12 15.75h.007v.008H12v-.008Z" />
-                  </svg>
-                  <div>
-                    <p className="text-xs font-semibold text-amber-700 uppercase tracking-wide mb-0.5">Reconciliation Flag</p>
-                    {reconNotes.map((note, i) => (
-                      <p key={i} className="text-xs text-amber-700">{note}</p>
-                    ))}
-                  </div>
-                </div>
-              )}
+                {/* Stale-data + reconciliation-flag warnings — both can be
+                    active at once on Overview; capped to showing the single
+                    highest-priority one inline with a "+N more" affordance
+                    instead of stacking every active banner. Stale data ranks
+                    first (data currency is the more fundamental trust signal). */}
+                {(() => {
+                  const items: AlertBannerItem[] = [];
+                  if (isStale) {
+                    items.push({ key: "stale", message: `Data last updated ${daysStale} days ago — verify this reflects the current close period.` });
+                  }
+                  if (reconNotes.length > 0) {
+                    items.push({ key: "recon", title: "Reconciliation Flag", message: reconNotes.join(" ") });
+                  }
+                  return <AlertBannerStack items={items} />;
+                })()}
+              </div>
 
               {/* Hero: the number IS the deliverable */}
-              <div className="pt-2 pb-1">
+              <div className="[grid-area:hero] pt-2 pb-1">
                 <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-1">Net Income · {currentMonth}</p>
                 <p className={`font-bold tracking-tight tabular-nums mt-1 text-6xl ${ni < 0 ? "text-red-600" : "text-gray-900"}`}>
                   {fmtExec(ni)}
                 </p>
                 <p className="text-sm text-gray-500 mt-1.5">
-                  {niMargin.toFixed(1)}% margin · {formatCurrency(niVsBudget, { compact: true, showSign: true })} vs budget
+                  {Math.abs(is.revenue._total.actual) < MARGIN_REVENUE_FLOOR
+                    ? formatMarginPct(niMargin, is.revenue._total.actual)
+                    : `${formatMarginPct(niMargin, is.revenue._total.actual)} margin`} · {formatCurrency(niVsBudget, { compact: true, showSign: true })} vs budget
                 </p>
               </div>
 
-              {/* Secondary stats: plain inline row, no individual card borders */}
-              <div className="flex flex-wrap items-baseline gap-x-8 gap-y-2 py-3 border-y border-gray-200">
-                {[
-                  { label: "Revenue", value: fmtExec(is.revenue._total.actual) },
-                  { label: "Gross Profit", value: fmtExec(is.gross_profit.actual) },
-                  { label: "OPEX", value: fmtExec(is.opex._total.actual) },
-                  { label: "NOI", value: fmtExec(is.net_operating_income.actual) },
-                ].map((s) => (
-                  <div key={s.label}>
-                    <span className="text-xs text-gray-400">{s.label}: </span>
-                    <span className="text-sm font-semibold text-gray-800 tabular-nums">{s.value}</span>
-                  </div>
-                ))}
+              {/* KPI row — prorated vs budget */}
+              <div className="[grid-area:kpi]">
+                <IncomeKpiRow
+                  current={currentData}
+                  prior={priorData}
+                  runRateFactor={runRateFactor}
+                  pacingPct={isFullMonth ? null : pacingPct}
+                />
               </div>
 
-              {/* KPI row — prorated vs budget */}
-              <IncomeKpiRow
-                current={currentData}
-                prior={priorData}
-                runRateFactor={runRateFactor}
-                pacingPct={isFullMonth ? null : pacingPct}
-              />
-
-              <TrendChart data={periodTrend} />
+              <div className="[grid-area:trend]">
+                <TrendChart data={periodTrend} />
+              </div>
 
               {/* Full income statement — collapsed line items by default,
                   "Show full breakdown" (inside PlTable) reveals detail. */}
-              <PlTable current={currentData} prior={priorData} pacingPct={isFullMonth ? null : pacingPct} />
+              <div className="[grid-area:pltable]">
+                <PlTable current={currentData} prior={priorData} pacingPct={isFullMonth ? null : pacingPct} />
+              </div>
 
               {/* Variance analysis — section-level flags only; account-level detail lives on GL Check */}
-              <VariancePanel
-                current={currentData}
-                prior={priorData}
-                glFlags={[]}
-                priorMonth={priorMonth}
-                pacingPct={isFullMonth ? null : pacingPct}
-              />
-            </>
+              <div className="[grid-area:variance]">
+                <VariancePanel
+                  current={currentData}
+                  prior={priorData}
+                  glFlags={[]}
+                  priorMonth={priorMonth}
+                  pacingPct={isFullMonth ? null : pacingPct}
+                />
+              </div>
+            </div>
           );
         })() : activeView === "overview" ? (
           <NoLocationData location={activeLocation} detail="Financial data for this location hasn't been uploaded yet." />

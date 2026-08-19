@@ -1,10 +1,16 @@
+"use client";
+
 import type { OccupancyData } from "@/types/dashboard";
 import { formatCurrency } from "@/lib/formatCurrency";
+import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
 
 interface Props {
   current: OccupancyData | null;
   prior: OccupancyData | null;
   expectedMonth?: string;
+  /** Last N months of occupancy, oldest first — fills the large blank area
+   * below the single stat card with a trend chart instead of empty space. */
+  history?: { month: string; occupancy_pct: number | null }[];
 }
 
 function delta(curr: number | undefined, prev: number | undefined): string | null {
@@ -24,7 +30,73 @@ function fmt$(n: number | undefined): string {
   return formatCurrency(n, { zeroDash: false });
 }
 
-export function OccupancySection({ current, prior, expectedMonth }: Props) {
+function OccupancyTrendChart({ history }: { history: { month: string; occupancy_pct: number | null }[] }) {
+  const chartData = history.filter(h => h.occupancy_pct != null);
+  if (chartData.length < 2) return null;
+  const lastIndex = chartData.length - 1;
+
+  return (
+    <div className="px-4 pb-4 pt-3 border-t border-gray-100">
+      <p className="text-xs font-semibold text-gray-500 mb-2">6-Month Occupancy Trend</p>
+      <ResponsiveContainer width="100%" height={160} debounce={200}>
+        <AreaChart data={chartData} margin={{ top: 4, right: 12, left: 0, bottom: 0 }}>
+          <defs>
+            <linearGradient id="fillOccupancy" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="5%" stopColor="#F15B27" stopOpacity={0.08} />
+              <stop offset="95%" stopColor="#F15B27" stopOpacity={0} />
+            </linearGradient>
+          </defs>
+          <CartesianGrid strokeDasharray="3 3" stroke="#f4f4f4" />
+          <XAxis
+            dataKey="month"
+            tick={{ fontSize: 10, fill: "#9ca3af" }}
+            tickLine={false}
+            axisLine={false}
+            tickFormatter={(v: string) => v.split(" ")[0]}
+          />
+          <YAxis
+            tickFormatter={(v: number) => `${v}%`}
+            tick={{ fontSize: 10, fill: "#9ca3af" }}
+            tickLine={false}
+            axisLine={false}
+            width={36}
+          />
+          <Tooltip
+            formatter={(value) => [`${value}%`, "Occupancy"]}
+            labelStyle={{ fontSize: 11, fontWeight: 600 }}
+            contentStyle={{ fontSize: 11, border: "1px solid #e5e7eb", borderRadius: 8 }}
+          />
+          <Area
+            type="monotone"
+            dataKey="occupancy_pct"
+            stroke="#F15B27"
+            strokeWidth={2}
+            fill="url(#fillOccupancy)"
+            dot={(props: { cx?: number; cy?: number; index?: number }) => {
+              const { cx, cy, index } = props;
+              if (cx == null || cy == null || index == null) return <g />;
+              const isCurrent = index === lastIndex;
+              return (
+                <circle
+                  cx={cx}
+                  cy={cy}
+                  r={isCurrent ? 4.5 : 2.5}
+                  fill={isCurrent ? "#F15B27" : "#d1d5db"}
+                  stroke={isCurrent ? "#ffffff" : "none"}
+                  strokeWidth={isCurrent ? 1.5 : 0}
+                />
+              );
+            }}
+            activeDot={{ r: 5 }}
+            name="Occupancy"
+          />
+        </AreaChart>
+      </ResponsiveContainer>
+    </div>
+  );
+}
+
+export function OccupancySection({ current, prior, expectedMonth, history }: Props) {
   if (!current) {
     return (
       <div className="bg-white rounded-lg border border-gray-200 p-5 flex items-center gap-4">
@@ -155,6 +227,8 @@ export function OccupancySection({ current, prior, expectedMonth }: Props) {
           )}
         </div>
       )}
+
+      {history && <OccupancyTrendChart history={history} />}
     </div>
   );
 }

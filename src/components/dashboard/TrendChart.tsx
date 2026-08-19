@@ -44,6 +44,25 @@ function makeDot(lastIndex: number) {
   };
 }
 
+const LEGEND_ITEMS = [
+  { label: "Revenue", color: "#F15B27" },
+  { label: "Gross Profit", color: "#94a3b8" },
+  { label: "NOI", color: "#10b981" },
+];
+
+function renderLegend() {
+  return (
+    <ul className="flex items-center justify-center gap-4 pt-2 list-none m-0 p-0">
+      {LEGEND_ITEMS.map((item) => (
+        <li key={item.label} className="flex items-center gap-1.5 text-xs" style={{ color: "#374151" }}>
+          <span className="inline-block w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ backgroundColor: item.color }} />
+          {item.label}
+        </li>
+      ))}
+    </ul>
+  );
+}
+
 export function TrendChart({ data }: Props) {
   if (data.length === 0) {
     return (
@@ -100,7 +119,15 @@ export function TrendChart({ data }: Props) {
             labelStyle={{ fontSize: 12, fontWeight: 600 }}
             contentStyle={{ fontSize: 12, border: "1px solid #e5e7eb", borderRadius: 8 }}
           />
-          <Legend wrapperStyle={{ fontSize: 12 }} />
+          {/* Custom legend content — Recharts' default legend order doesn't
+              reliably follow JSX child order for this chart type, so it was
+              rendering "Gross Profit, NOI, Revenue" while the chart visually
+              stacks Revenue/GP on top and NOI as a separate lower line.
+              Rendering our own fixed order/colors guarantees Revenue,
+              Gross Profit, NOI regardless of internal render order (v3's
+              public Legend props omit a settable `payload`, so a custom
+              `content` renderer is the supported way to force this). */}
+          <Legend wrapperStyle={{ fontSize: 12 }} content={renderLegend} />
           <Area
             type="monotone"
             dataKey="revenue"
@@ -111,14 +138,20 @@ export function TrendChart({ data }: Props) {
             activeDot={{ r: 6 }}
             name="Revenue"
           />
+          {/* De-emphasized relative to Revenue/NOI (thinner + dashed) — on
+              high-margin locations (e.g. ~95-99% gross margin) this line
+              sits almost on top of Revenue, so a matching stroke weight
+              wastes a third of the chart's visual weight on a line that's
+              barely distinguishable from the one above it. */}
           <Area
             type="monotone"
             dataKey="gp"
             stroke="#94a3b8"
-            strokeWidth={2}
+            strokeWidth={1.25}
+            strokeDasharray="4 3"
             fill="url(#fillGP)"
             dot={currentDot}
-            activeDot={{ r: 6 }}
+            activeDot={{ r: 5 }}
             name="Gross Profit"
           />
           <Area

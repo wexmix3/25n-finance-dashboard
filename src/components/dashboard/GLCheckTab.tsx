@@ -14,6 +14,11 @@ interface Props {
   reviewedBy?: string | null;
   reviewedAt?: string | null;
   onReviewChange?: (reviewed: boolean) => void;
+  /** Gates the "Re-run GL Check" card — an ops/dev instruction (raw shell
+   * command), not something a non-technical viewer like a client should see.
+   * GL Check already re-renders live from the database; this is a manual
+   * re-run note for admins only. */
+  role?: string;
 }
 
 function fmtDate(iso?: string | null): string {
@@ -21,7 +26,7 @@ function fmtDate(iso?: string | null): string {
   return new Date(iso).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
 }
 
-export function GLCheckTab({ currentData, priorMonth, uploadedAt, reviewed, reviewedBy, reviewedAt, onReviewChange }: Props) {
+export function GLCheckTab({ currentData, priorMonth, uploadedAt, reviewed, reviewedBy, reviewedAt, onReviewChange, role }: Props) {
   const [pending, setPending] = useState(false);
   const [localReviewed, setLocalReviewed] = useState(reviewed ?? false);
   const [localReviewedBy, setLocalReviewedBy] = useState(reviewedBy ?? null);
@@ -152,13 +157,17 @@ export function GLCheckTab({ currentData, priorMonth, uploadedAt, reviewed, revi
       <ControlViolationsPanel violations={violations} />
       <JournalEntryPanel accounts={jeAccounts} />
 
-      {/* Re-run instructions */}
-      <div className="bg-gray-50 rounded-lg border border-gray-200 px-4 py-3">
-        <p className="text-xs font-medium text-gray-600 mb-1">Re-run GL Check</p>
-        <code className="text-xs text-gray-500 font-mono block">
-          python scripts/month-close/push_to_dashboard.py --location {currentData.location} --month &quot;{currentData.month}&quot; --variances
-        </code>
-      </div>
+      {/* Re-run instructions — admin/ops only. GL Check already re-renders
+          live from the database; this raw shell command is a manual re-run
+          note for ops, not something a non-technical viewer should see. */}
+      {role === "admin" && (
+        <div className="bg-gray-50 rounded-lg border border-gray-200 px-4 py-3">
+          <p className="text-xs font-medium text-gray-600 mb-1">Re-run GL Check</p>
+          <code className="text-xs text-gray-500 font-mono block">
+            python scripts/month-close/push_to_dashboard.py --location {currentData.location} --month &quot;{currentData.month}&quot; --variances
+          </code>
+        </div>
+      )}
     </div>
   );
 }

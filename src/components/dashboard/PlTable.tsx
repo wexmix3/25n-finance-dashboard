@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { FinancialData } from "@/types/dashboard";
-import { formatCurrency } from "@/lib/formatCurrency";
+import { formatCurrency, formatMarginPct } from "@/lib/formatCurrency";
 
 function fmtDollar(n: number): string {
   return formatCurrency(n);
@@ -249,7 +249,7 @@ export function PlTable({ current, prior, pacingPct, bare }: Props) {
 
           {/* Gross Profit */}
           <SubtotalRow
-            label={`Gross Profit (${is.gross_profit.margin_pct.toFixed(1)}%)`}
+            label={`Gross Profit (${formatMarginPct(is.gross_profit.margin_pct, totalRev)})`}
             actual={is.gross_profit.actual}
             budget={is.gross_profit.budget}
             prior={pi?.gross_profit.actual}
@@ -278,7 +278,7 @@ export function PlTable({ current, prior, pacingPct, bare }: Props) {
 
           {/* Net Operating Income */}
           <SubtotalRow
-            label={`Net Operating Income (${is.net_operating_income.margin_pct.toFixed(1)}%)`}
+            label={`Net Operating Income (${formatMarginPct(is.net_operating_income.margin_pct, totalRev)})`}
             actual={is.net_operating_income.actual}
             budget={is.net_operating_income.budget}
             prior={pi?.net_operating_income.actual}
@@ -303,7 +303,7 @@ export function PlTable({ current, prior, pacingPct, bare }: Props) {
 
           {/* Net Income */}
           <SubtotalRow
-            label={`Net Income (${is.net_income.margin_pct.toFixed(1)}%)`}
+            label={`Net Income (${formatMarginPct(is.net_income.margin_pct, totalRev)})`}
             actual={is.net_income.actual}
             budget={null}
             prior={pi?.net_income.actual}
