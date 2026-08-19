@@ -13,10 +13,15 @@ interface Props {
   history?: { month: string; occupancy_pct: number | null }[];
 }
 
-function delta(curr: number | undefined, prev: number | undefined): string | null {
+/** Whole-number percent delta in accounting language — negatives in
+ * parentheses rather than a minus sign, matching the currency convention
+ * used everywhere else on the dashboard. Exported for reuse by the
+ * Overview hero's Occupancy card, which needs the same formatting. */
+export function occupancyDeltaLabel(curr: number | undefined, prev: number | undefined): string | null {
   if (curr == null || prev == null || prev === 0) return null;
-  const d = curr - prev;
-  return `${d > 0 ? "+" : ""}${d.toFixed(1)}`;
+  const d = Math.round(curr - prev);
+  if (d === 0) return "flat MoM";
+  return d > 0 ? `+${d}% MoM` : `(${Math.abs(d)}%) MoM`;
 }
 
 function deltaInt(curr: number | undefined, prev: number | undefined): string | null {
@@ -119,7 +124,7 @@ export function OccupancySection({ current, prior, expectedMonth, history }: Pro
     );
   }
 
-  const occDelta = delta(current.occupancy_pct ?? undefined, prior?.occupancy_pct ?? undefined);
+  const occDelta = occupancyDeltaLabel(current.occupancy_pct ?? undefined, prior?.occupancy_pct ?? undefined);
   const memberDelta = deltaInt(current.total_members ?? undefined, prior?.total_members ?? undefined);
 
   const utilization =
@@ -142,8 +147,8 @@ export function OccupancySection({ current, prior, expectedMonth, history }: Pro
             {current.occupancy_pct != null ? `${current.occupancy_pct}%` : "—"}
           </p>
           {occDelta && (
-            <p className={`text-xs mt-0.5 ${occDelta.startsWith("+") ? "text-emerald-600" : "text-red-600"}`}>
-              {occDelta}pp MoM
+            <p className={`text-xs mt-0.5 ${occDelta.startsWith("(") ? "text-red-600" : occDelta.startsWith("+") ? "text-emerald-600" : "text-gray-400"}`}>
+              {occDelta}
             </p>
           )}
         </div>

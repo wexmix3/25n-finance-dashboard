@@ -12,7 +12,7 @@ import { IncomeKpiRow } from "@/components/dashboard/IncomeKpiRow";
 import { InsightPanel } from "@/components/dashboard/InsightPanel";
 import { PlTable } from "@/components/dashboard/PlTable";
 import { TrendChart } from "@/components/dashboard/TrendChart";
-import { OccupancySection } from "@/components/dashboard/OccupancySection";
+import { OccupancySection, occupancyDeltaLabel } from "@/components/dashboard/OccupancySection";
 import { VariancePanel } from "@/components/dashboard/VariancePanel";
 import { LocationSummaryTable } from "@/components/dashboard/LocationSummaryTable";
 import { DataDictionary } from "@/components/dashboard/DataDictionary";
@@ -141,6 +141,40 @@ function computePortfolioTrend(locationData: Record<Location, LocationData>): Tr
 
 function fmtExec(n: number): string {
   return formatCurrency(n, { compact: true, zeroDash: false });
+}
+
+/** Portfolio-wide occupancy — simple average across whichever locations
+ * have a current Kube occupancy record, so a location that hasn't reported
+ * yet doesn't silently zero out the portfolio figure (same guard pattern as
+ * computePortfolioSnapshot for financials). */
+function computePortfolioOccupancy(locationData: Record<Location, LocationData>) {
+  let sum = 0, count = 0, priorSum = 0, priorCount = 0;
+  for (const loc of LOCATIONS) {
+    const pct = locationData[loc].occupancy?.occupancy_pct;
+    if (pct != null) { sum += pct; count++; }
+    const priorPct = locationData[loc].priorOccupancy?.occupancy_pct;
+    if (priorPct != null) { priorSum += priorPct; priorCount++; }
+  }
+  return {
+    avg: count > 0 ? sum / count : null,
+    count,
+    priorAvg: priorCount > 0 ? priorSum / priorCount : null,
+  };
+}
+
+/** Boxed headline stat — the Net Income / Occupancy hero pair at the top of
+ * every Overview. Both cards share this so the pair reads as one matched
+ * row instead of two differently-styled numbers. */
+function HeroCard({ label, value, valueNegative, sub }: { label: string; value: string; valueNegative?: boolean; sub?: string }) {
+  return (
+    <div className="bg-white rounded-lg border border-gray-200 p-5 h-full">
+      <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-1">{label}</p>
+      <p className={`font-bold tracking-tight tabular-nums text-4xl ${valueNegative ? "text-red-600" : "text-gray-900"}`}>
+        {value}
+      </p>
+      {sub && <p className="text-sm text-gray-500 mt-1.5">{sub}</p>}
+    </div>
+  );
 }
 
 function NoLocationData({ location, detail }: { location: string; detail: string }) {
@@ -362,6 +396,8 @@ export function DashboardClient({ locationData, packetData, userEmail, role }: P
           const atRisk = LOCATIONS.filter(l => healthStatuses[l] === "yellow").map(l => l);
           const offTrack = LOCATIONS.filter(l => healthStatuses[l] === "red").map(l => l);
           const scored = LOCATIONS.filter(l => healthStatuses[l] !== undefined).length;
+          const portfolioOcc = computePortfolioOccupancy(locationData);
+          const portfolioOccDelta = occupancyDeltaLabel(portfolioOcc.avg ?? undefined, portfolioOcc.priorAvg ?? undefined);
           const headline = scored === 0
             ? "Upload financial data to see portfolio performance."
             : offTrack.length > 0
@@ -374,12 +410,22 @@ export function DashboardClient({ locationData, packetData, userEmail, role }: P
             <div className="space-y-5">
               <InsightPanel insight={headline} detail={`Portfolio · ${currentMonth}`} />
 
-              {/* Hero: portfolio number, no card chrome */}
-              <div className="pt-1 pb-1">
-                <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-1">Net Income · {currentMonth}</p>
-                <p className={`text-4xl font-bold tracking-tight tabular-nums ${portfolio.ni < 0 ? "text-red-600" : "text-gray-900"}`}>
-                  {fmtExec(portfolio.ni)}
-                </p>
+              {/* Hero pair: Net Income + Occupancy, boxed and filling the full row width */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <HeroCard
+                  label={`Net Income · ${currentMonth}`}
+                  value={fmtExec(portfolio.ni)}
+                  valueNegative={portfolio.ni < 0}
+                />
+                <HeroCard
+                  label={`Occupancy · ${currentMonth}`}
+                  value={portfolioOcc.avg != null ? `${Math.round(portfolioOcc.avg)}%` : "—"}
+                  sub={
+                    portfolioOcc.avg == null
+                      ? "No occupancy data yet"
+                      : `${portfolioOcc.count} of ${LOCATIONS.length} locations reporting${portfolioOccDelta ? ` · ${portfolioOccDelta}` : ""}`
+                  }
+                />
               </div>
 
               {portfolioTrend.length > 0 && (
@@ -488,7 +534,6 @@ export function DashboardClient({ locationData, packetData, userEmail, role }: P
               onReviewChange={(reviewed) =>
                 setReviewOverrides(prev => ({ ...prev, [`${activeLocation}|${current.month}`]: reviewed }))
               }
-              role={role}
             />
           ) : (
             <NoLocationData location={activeLocation} detail="GL data for this location hasn't been uploaded yet." />
@@ -536,6 +581,7 @@ export function DashboardClient({ locationData, packetData, userEmail, role }: P
           const ni = is.net_income.actual;
           const niMargin = is.net_income.margin_pct;
           const niVsBudget = ni - is.net_income.budget;
+          const occDeltaLoc = occupancyDeltaLabel(occupancy?.occupancy_pct ?? undefined, priorOccupancy?.occupancy_pct ?? undefined);
           const heroInsight = currentData.insights?.[0];
           const heroDetail = currentData.insights?.[1];
           return (
@@ -550,8 +596,8 @@ export function DashboardClient({ locationData, packetData, userEmail, role }: P
             <div
               className={[
                 "grid grid-cols-1 gap-5 lg:grid-cols-2 lg:gap-x-8 lg:gap-y-5 lg:items-start",
-                "[grid-template-areas:'insight'_'hero'_'kpi'_'trend'_'pltable'_'variance']",
-                "lg:[grid-template-areas:'insight_insight'_'hero_kpi'_'trend_variance'_'pltable_pltable']",
+                "[grid-template-areas:'insight'_'hero'_'occupancy'_'kpi'_'trend'_'pltable'_'variance']",
+                "lg:[grid-template-areas:'insight_insight'_'hero_occupancy'_'kpi_kpi'_'trend_variance'_'pltable_pltable']",
               ].join(" ")}
             >
               <div className="[grid-area:insight] space-y-2.5">
@@ -579,17 +625,31 @@ export function DashboardClient({ locationData, packetData, userEmail, role }: P
                 })()}
               </div>
 
-              {/* Hero: the number IS the deliverable */}
-              <div className="[grid-area:hero] pt-2 pb-1">
-                <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-1">Net Income · {currentMonth}</p>
-                <p className={`font-bold tracking-tight tabular-nums mt-1 text-4xl ${ni < 0 ? "text-red-600" : "text-gray-900"}`}>
-                  {fmtExec(ni)}
-                </p>
-                <p className="text-sm text-gray-500 mt-1.5">
-                  {Math.abs(is.revenue._total.actual) < MARGIN_REVENUE_FLOOR
-                    ? formatMarginPct(niMargin, is.revenue._total.actual)
-                    : `${formatMarginPct(niMargin, is.revenue._total.actual)} margin`} · {formatCurrency(niVsBudget, { compact: true, showSign: true })} vs budget
-                </p>
+              {/* Hero pair: Net Income + Occupancy, boxed and filling the full row width */}
+              <div className="[grid-area:hero]">
+                <HeroCard
+                  label={`Net Income · ${currentMonth}`}
+                  value={fmtExec(ni)}
+                  valueNegative={ni < 0}
+                  sub={
+                    (Math.abs(is.revenue._total.actual) < MARGIN_REVENUE_FLOOR
+                      ? formatMarginPct(niMargin, is.revenue._total.actual)
+                      : `${formatMarginPct(niMargin, is.revenue._total.actual)} margin`) +
+                    ` · ${formatCurrency(niVsBudget, { compact: true, showSign: true })} vs budget`
+                  }
+                />
+              </div>
+
+              <div className="[grid-area:occupancy]">
+                <HeroCard
+                  label={`Occupancy · ${currentMonth}`}
+                  value={occupancy?.occupancy_pct != null ? `${Math.round(occupancy.occupancy_pct)}%` : "—"}
+                  sub={
+                    occupancy?.occupancy_pct == null
+                      ? "No occupancy data yet for this period"
+                      : occDeltaLoc ?? undefined
+                  }
+                />
               </div>
 
               {/* KPI row — prorated vs budget */}
