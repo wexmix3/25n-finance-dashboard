@@ -1,5 +1,4 @@
 import { FinancialData } from "@/types/dashboard";
-import { InfoPopover } from "@/components/ui/InfoPopover";
 import { formatCurrency, formatMarginPct, MARGIN_REVENUE_FLOOR } from "@/lib/formatCurrency";
 
 function fmt(n: number): string {
@@ -25,7 +24,6 @@ interface KpiCardProps {
   sub?: string;
   projection?: string;
   highlight?: boolean;
-  info?: { title: string; formula?: string; source?: string; note?: string };
   /** "vs last" / "vs budget" — a light tag replacing the old full-height
    * divider + separate group headers, so 5 cards read as one row with two
    * conceptually grouped ends instead of two uneven groups (3-card / 2-card)
@@ -33,26 +31,29 @@ interface KpiCardProps {
   groupLabel?: string;
 }
 
-function KpiCard({ label, value, valueNegative, delta, sub, projection, highlight, info, groupLabel }: KpiCardProps) {
+function KpiCard({ label, value, valueNegative, delta, sub, projection, highlight, groupLabel }: KpiCardProps) {
   // Paper-white floating stat tile — soft shadow instead of a hairline
   // border, deliberately distinct from the bordered white "container" cards
   // (tables, panels) elsewhere on the dashboard, so a glanceable number and
   // a detailed data table don't carry equal visual weight. The single most
   // important metric gets a colored left accent instead of a heavier border,
   // keeping the emphasis without adding a box.
+  // h-full + flex-col fills the grid cell's row height and anchors the
+  // sub/projection line to the bottom (mt-auto below), so cards with a
+  // shorter label or sub-line still bottom-align with their row neighbors
+  // instead of the row's edge trailing off wherever the longest content ends.
   return (
-    <div className={`rounded-2xl bg-white p-4 shadow-[0_1px_2px_rgba(0,0,0,0.04)] ${highlight ? "border-l-4 border-[#F15B27]" : "border border-gray-100"}`}>
+    <div className={`h-full flex flex-col rounded-2xl bg-white p-4 shadow-[0_1px_2px_rgba(0,0,0,0.04)] ${highlight ? "border-l-4 border-[#F15B27]" : "border border-gray-100"}`}>
       <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider flex items-center flex-wrap gap-x-1.5 gap-y-0.5">
         <span className="flex items-center">
           {label}
-          {info && <InfoPopover {...info} />}
         </span>
         {groupLabel && (
           <span className="text-[9px] font-semibold text-gray-300 normal-case tracking-normal">{groupLabel}</span>
         )}
         {delta && (
           <span className={`inline-flex items-center px-1.5 py-0.5 rounded-full text-[10px] font-bold tracking-normal normal-case ${
-            delta.positive ? "bg-emerald-50 text-emerald-600" : "bg-red-50 text-red-500"
+            delta.positive ? "bg-emerald-50 text-emerald-600" : "bg-red-50 text-red-600"
           }`}>
             {delta.label}
           </span>
@@ -60,13 +61,15 @@ function KpiCard({ label, value, valueNegative, delta, sub, projection, highligh
       </p>
       {/* Negative = red, everything else = neutral — same convention as the
           P&L table below it, so a loss reads the same way in both places. */}
-      <p className={`mt-1 text-3xl font-bold tabular-nums tracking-tight ${valueNegative ? "text-red-600" : "text-gray-900"}`}>{value}</p>
-      {sub && (
-        <p className="mt-0.5 text-xs font-medium text-gray-400">{sub}</p>
-      )}
-      {projection && (
-        <p className="mt-0.5 text-xs text-gray-400">{projection}</p>
-      )}
+      <p className={`mt-1 text-2xl font-bold tabular-nums tracking-tight ${valueNegative ? "text-red-600" : "text-gray-900"}`}>{value}</p>
+      <div className="mt-auto">
+        {sub && (
+          <p className="mt-0.5 text-xs font-medium text-gray-400">{sub}</p>
+        )}
+        {projection && (
+          <p className="mt-0.5 text-xs text-gray-400">{projection}</p>
+        )}
+      </div>
     </div>
   );
 }
@@ -138,7 +141,6 @@ export function IncomeKpiRow({ current, prior, runRateFactor, pacingPct }: Props
         delta={revDelta ?? undefined}
         sub={!revDelta ? mtdLabel : undefined}
         projection={projRev}
-        info={{ title: "Total Revenue", formula: "Workspace Rental + Meeting Space + Package Revenue + Member Amenities + Membership + Registration & Access + Miscellaneous", source: "Yardi Scheduler_Reports — 12-Month Income Statement" }}
       />
       <KpiCard
         label="Net Margin"
@@ -146,8 +148,7 @@ export function IncomeKpiRow({ current, prior, runRateFactor, pacingPct }: Props
         value={formatMarginPct(netMargin, rev)}
         valueNegative={!netMarginTooSmall && netMargin < 0}
         delta={!netMarginTooSmall ? (netMarginDelta ? { label: `${netMarginDelta.diff >= 0 ? "+" : ""}${netMarginDelta.diff.toFixed(1)}pp`, positive: netMarginDelta.positive } : undefined) : undefined}
-        sub={netMarginTooSmall ? "revenue too small for a % — see $ figures" : !netMarginDelta ? mtdLabel : undefined}
-        info={{ title: "Net Margin", formula: "Net Income ÷ Total Revenue", source: "Yardi Scheduler_Reports", note: `The bottom-line profitability rate — what share of every revenue dollar the location actually keeps after all expenses. Below $${MARGIN_REVENUE_FLOOR.toLocaleString()} of revenue, the % swings wildly, so a low-revenue notice is shown instead.` }}
+        sub={netMarginTooSmall ? "low revenue" : !netMarginDelta ? mtdLabel : undefined}
       />
       <KpiCard
         label="Net Income"
@@ -156,7 +157,6 @@ export function IncomeKpiRow({ current, prior, runRateFactor, pacingPct }: Props
         valueNegative={ni < 0}
         delta={niDelta ?? undefined}
         sub={!niDelta ? mtdLabel : undefined}
-        info={{ title: "Net Income", formula: "NOI + Other Income − Other Expenses", source: "Yardi Scheduler_Reports" }}
       />
       <KpiCard
         label="Revenue vs Budget"
@@ -165,7 +165,6 @@ export function IncomeKpiRow({ current, prior, runRateFactor, pacingPct }: Props
         delta={vsBudgetRevPct !== null ? { label: `${vsBudgetRevPct >= 0 ? "+" : ""}${vsBudgetRevPct.toFixed(1)}%`, positive: vsBudgetRevPct >= 0 } : undefined}
         sub={vsBudgetRevPct === null ? "vs full-month budget" : undefined}
         highlight
-        info={{ title: "Revenue vs Budget", formula: "Revenue − Full-Month Budget", source: "Budget from Yardi Budget Comparison export", note: "Most 25N revenue is contractual and posts in full on the 1st, so this is always compared to the full-month budget — never prorated by elapsed days — and shown as a $ variance." }}
       />
       <KpiCard
         label="Net Income vs Budget"
@@ -181,7 +180,6 @@ export function IncomeKpiRow({ current, prior, runRateFactor, pacingPct }: Props
         delta={vsBudgetNi !== null ? undefined : niMissTooSmallForPct ? { label: ni >= proratedNiBudget ? "on plan" : "miss", positive: ni >= proratedNiBudget } : undefined}
         valueNegative={vsBudgetNi !== null ? vsBudgetNi < 0 : niMissTooSmallForPct ? ni < proratedNiBudget : false}
         highlight
-        info={{ title: "Net Income vs Budget", formula: isPartial ? `(MTD NI − NI Budget × ${Math.round(effectivePacing * 100)}%) ÷ |Prorated NI Budget|` : "(NI − Full-Month NI Budget) ÷ |NI Budget|", source: "NI budget from Yardi Budget Comparison export (account 9900)", note: `Primary profitability-vs-plan signal now that NOI is no longer shown separately. Below a $${PCT_DENOMINATOR_FLOOR.toLocaleString()} budget, the % swings wildly (a small-dollar miss reads as +1000%+), so the $ miss is shown instead.` }}
       />
     </div>
   );

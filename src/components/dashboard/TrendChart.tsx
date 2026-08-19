@@ -46,7 +46,7 @@ function makeDot(lastIndex: number) {
 
 const LEGEND_ITEMS = [
   { label: "Revenue", color: "#F15B27" },
-  { label: "Gross Profit", color: "#94a3b8" },
+  { label: "Gross Profit", color: "#9ca3af" },
   { label: "NOI", color: "#10b981" },
 ];
 
@@ -87,8 +87,8 @@ export function TrendChart({ data }: Props) {
               <stop offset="95%" stopColor="#F15B27" stopOpacity={0}/>
             </linearGradient>
             <linearGradient id="fillGP" x1="0" y1="0" x2="0" y2="1">
-              <stop offset="5%" stopColor="#94a3b8" stopOpacity={0.05}/>
-              <stop offset="95%" stopColor="#94a3b8" stopOpacity={0}/>
+              <stop offset="5%" stopColor="#9ca3af" stopOpacity={0.05}/>
+              <stop offset="95%" stopColor="#9ca3af" stopOpacity={0}/>
             </linearGradient>
             <linearGradient id="fillNOI" x1="0" y1="0" x2="0" y2="1">
               <stop offset="5%" stopColor="#10b981" stopOpacity={0.05}/>
@@ -146,7 +146,7 @@ export function TrendChart({ data }: Props) {
           <Area
             type="monotone"
             dataKey="gp"
-            stroke="#94a3b8"
+            stroke="#9ca3af"
             strokeWidth={1.25}
             strokeDasharray="4 3"
             fill="url(#fillGP)"

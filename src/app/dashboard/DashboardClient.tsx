@@ -334,6 +334,8 @@ export function DashboardClient({ locationData, packetData, userEmail, role }: P
             );
           })()}
 
+          <DataDictionary />
+
           <span className="text-xs text-gray-400 hidden md:block">{userEmail}</span>
           {role === "admin" && (
             <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-semibold bg-[#fdf2e9] text-[#F15B27]">
@@ -375,7 +377,7 @@ export function DashboardClient({ locationData, packetData, userEmail, role }: P
               {/* Hero: portfolio number, no card chrome */}
               <div className="pt-1 pb-1">
                 <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-1">Net Income · {currentMonth}</p>
-                <p className={`text-6xl font-bold tracking-tight tabular-nums ${portfolio.ni < 0 ? "text-red-600" : "text-gray-900"}`}>
+                <p className={`text-4xl font-bold tracking-tight tabular-nums ${portfolio.ni < 0 ? "text-red-600" : "text-gray-900"}`}>
                   {fmtExec(portfolio.ni)}
                 </p>
               </div>
@@ -448,7 +450,7 @@ export function DashboardClient({ locationData, packetData, userEmail, role }: P
                   // the sidebar badge.
                   return glIssues > 0 && !isReviewed && (
                     <span className={`ml-1.5 inline-flex items-center justify-center w-4 h-4 rounded-full text-[10px] font-bold ${
-                      glIssues <= 5 ? "bg-amber-100 text-amber-700" : "bg-red-100 text-red-700"
+                      glIssues <= 5 ? "bg-amber-50 text-amber-700" : "bg-red-50 text-red-600"
                     }`}>
                       {glIssues}
                     </span>
@@ -580,7 +582,7 @@ export function DashboardClient({ locationData, packetData, userEmail, role }: P
               {/* Hero: the number IS the deliverable */}
               <div className="[grid-area:hero] pt-2 pb-1">
                 <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-1">Net Income · {currentMonth}</p>
-                <p className={`font-bold tracking-tight tabular-nums mt-1 text-6xl ${ni < 0 ? "text-red-600" : "text-gray-900"}`}>
+                <p className={`font-bold tracking-tight tabular-nums mt-1 text-4xl ${ni < 0 ? "text-red-600" : "text-gray-900"}`}>
                   {fmtExec(ni)}
                 </p>
                 <p className="text-sm text-gray-500 mt-1.5">
@@ -629,11 +631,10 @@ export function DashboardClient({ locationData, packetData, userEmail, role }: P
         )}
       </main>
 
-      {/* Footer — data dictionary link */}
+      {/* Footer */}
       <footer className="border-t border-gray-100 bg-white">
-        <div className="max-w-6xl mx-auto px-4 sm:px-6 py-3 flex items-center justify-between">
+        <div className="max-w-6xl mx-auto px-4 sm:px-6 py-3">
           <p className="text-xs text-gray-300">25N Coworking · Financial Dashboard</p>
-          <DataDictionary />
         </div>
       </footer>
     </DashboardShell>

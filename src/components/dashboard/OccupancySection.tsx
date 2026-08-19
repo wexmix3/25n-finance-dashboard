@@ -142,7 +142,7 @@ export function OccupancySection({ current, prior, expectedMonth, history }: Pro
             {current.occupancy_pct != null ? `${current.occupancy_pct}%` : "—"}
           </p>
           {occDelta && (
-            <p className={`text-xs mt-0.5 ${occDelta.startsWith("+") ? "text-emerald-600" : "text-red-500"}`}>
+            <p className={`text-xs mt-0.5 ${occDelta.startsWith("+") ? "text-emerald-600" : "text-red-600"}`}>
               {occDelta}pp MoM
             </p>
           )}
@@ -155,7 +155,7 @@ export function OccupancySection({ current, prior, expectedMonth, history }: Pro
             {current.total_members != null ? current.total_members.toLocaleString() : "—"}
           </p>
           {memberDelta && (
-            <p className={`text-xs mt-0.5 ${memberDelta.startsWith("+") ? "text-emerald-600" : "text-red-500"}`}>
+            <p className={`text-xs mt-0.5 ${memberDelta.startsWith("+") ? "text-emerald-600" : "text-red-600"}`}>
               {memberDelta} MoM
             </p>
           )}
@@ -187,7 +187,7 @@ export function OccupancySection({ current, prior, expectedMonth, history }: Pro
         {utilization != null && (
           <div>
             <p className="text-xs text-gray-400 mb-0.5">Utilization</p>
-            <p className={`text-2xl font-semibold ${utilization >= 80 ? "text-emerald-600" : utilization >= 60 ? "text-yellow-600" : "text-red-500"}`}>
+            <p className={`text-2xl font-semibold ${utilization >= 80 ? "text-emerald-600" : utilization >= 60 ? "text-amber-700" : "text-red-600"}`}>
               {utilization}%
             </p>
             <p className="text-xs text-gray-400 mt-0.5">booked / available</p>

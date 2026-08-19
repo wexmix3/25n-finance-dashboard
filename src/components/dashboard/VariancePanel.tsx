@@ -148,7 +148,7 @@ export function VariancePanel({ current, prior, glFlags = [], priorMonth, pacing
                         <td className={`px-4 py-2 text-right font-semibold ${unfav ? "text-red-600" : "text-emerald-600"}`}>
                           {f.variance > 0 ? "+" : ""}{fmtK(f.variance)}
                         </td>
-                        <td className={`px-4 py-2 text-right ${unfav ? "text-red-500" : "text-emerald-500"}`}>
+                        <td className={`px-4 py-2 text-right ${unfav ? "text-red-600" : "text-emerald-600"}`}>
                           {fmtPct(f.pct)}
                         </td>
                       </tr>
@@ -213,7 +213,7 @@ export function VariancePanel({ current, prior, glFlags = [], priorMonth, pacing
                               <td className={`px-4 py-1.5 text-right font-semibold ${unfav ? "text-red-600" : "text-emerald-600"}`}>
                                 {f.variance > 0 ? "+" : ""}{fmtK(f.variance)}
                               </td>
-                              <td className={`px-4 py-1.5 text-right ${unfav ? "text-red-500" : "text-emerald-500"}`}>
+                              <td className={`px-4 py-1.5 text-right ${unfav ? "text-red-600" : "text-emerald-600"}`}>
                                 {f.variance_pct !== null ? fmtPct(f.variance_pct) : "new"}
                               </td>
                               <td className="px-4 py-1.5 text-gray-400 whitespace-nowrap">{f.rule_triggered}</td>

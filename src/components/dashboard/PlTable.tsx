@@ -70,7 +70,7 @@ function Row({ label, actual, budget, prior, indent, bold, isExpense, separator,
           ? "text-gray-300"
           : varFavorable
           ? "text-emerald-600"
-          : "text-red-500"
+          : "text-red-600"
       }`}>
         {variance !== undefined ? fmtVariance(variance) : ""}
       </td>
@@ -110,11 +110,11 @@ function SubtotalRow({ label, actual, budget, prior, isExpense, borderStrength =
       <td className={`${numClass} ${actual < 0 ? "text-red-600" : "text-gray-900"}`}>
         {fmtDollar(actual)}
       </td>
-      <td className={`${numClass} ${effectiveBudget !== null && effectiveBudget < 0 ? "text-red-400" : "text-gray-400"}`}>
+      <td className={`${numClass} ${effectiveBudget !== null && effectiveBudget < 0 ? "text-red-600" : "text-gray-400"}`}>
         {effectiveBudget !== null ? fmtDollar(effectiveBudget) : ""}
       </td>
       <td className={`${numClass} ${
-        variance === null || variance === 0 ? "text-gray-300" : varFavorable ? "text-emerald-600" : "text-red-500"
+        variance === null || variance === 0 ? "text-gray-300" : varFavorable ? "text-emerald-600" : "text-red-600"
       }`}>
         {variance !== null ? fmtVariance(variance) : ""}
       </td>

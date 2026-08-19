@@ -42,7 +42,7 @@ export function PeriodBanner({ currentMonth, priorMonth, uploadedAt, locked }: P
         <div className="flex items-center gap-2">
           <span className="text-base font-bold text-gray-900">{currentMonth}</span>
           {isFull ? (
-            <span className="text-xs font-semibold text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded">Final</span>
+            <span className="text-xs font-semibold text-emerald-600 bg-emerald-50 px-1.5 py-0.5 rounded">Final</span>
           ) : (
             <span className="text-xs font-semibold text-[#F15B27] bg-[#fdf2e9] px-1.5 py-0.5 rounded">MTD</span>
           )}
@@ -64,7 +64,7 @@ export function PeriodBanner({ currentMonth, priorMonth, uploadedAt, locked }: P
         <div className="flex items-center gap-2">
           <span className="text-sm font-medium text-gray-400">{priorMonth}</span>
           {locked && (
-            <span className="inline-flex items-center px-1.5 py-0.5 rounded text-xs font-semibold bg-emerald-50 text-emerald-700">
+            <span className="inline-flex items-center px-1.5 py-0.5 rounded text-xs font-semibold bg-emerald-50 text-emerald-600">
               Final
             </span>
           )}
