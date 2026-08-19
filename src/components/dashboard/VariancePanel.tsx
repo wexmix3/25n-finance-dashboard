@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import type { FinancialData, VarianceFlag } from "@/types/dashboard";
+import { formatCurrency } from "@/lib/formatCurrency";
 
 // ── Section-level flags (computed from P&L sections) ──────────────────────────
 
@@ -59,9 +60,7 @@ function buildSectionFlags(current: FinancialData, prior: FinancialData): Sectio
 // ── Formatters ────────────────────────────────────────────────────────────────
 
 function fmtK(v: number): string {
-  const abs = Math.abs(v);
-  const str = abs >= 1000 ? `$${(abs / 1000).toFixed(1)}K` : `$${Math.round(abs).toLocaleString()}`;
-  return v < 0 ? `(${str})` : str;
+  return formatCurrency(v, { compact: true, zeroDash: false });
 }
 
 function fmtPct(v: number | null): string {
@@ -126,7 +125,7 @@ export function VariancePanel({ current, prior, glFlags = [], priorMonth, pacing
             <div className="overflow-x-auto">
               <div className="px-4 pt-3 pb-1 flex items-start justify-between gap-4">
                 <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Line Items to Review ({sectionFlags.length})</p>
-                <p className="text-xs text-gray-400 italic text-right flex-shrink-0">MTD actuals vs prior full month — variances are amplified early in the period</p>
+                <p className="text-xs text-gray-400 italic text-right flex-shrink-0">MTD actuals vs prior full month</p>
               </div>
               <table className="w-full text-xs">
                 <thead>
@@ -149,7 +148,7 @@ export function VariancePanel({ current, prior, glFlags = [], priorMonth, pacing
                         <td className={`px-4 py-2 text-right font-semibold ${unfav ? "text-red-600" : "text-emerald-600"}`}>
                           {f.variance > 0 ? "+" : ""}{fmtK(f.variance)}
                         </td>
-                        <td className={`px-4 py-2 text-right ${unfav ? "text-red-500" : "text-emerald-500"}`}>
+                        <td className={`px-4 py-2 text-right ${unfav ? "text-red-600" : "text-emerald-600"}`}>
                           {fmtPct(f.pct)}
                         </td>
                       </tr>
@@ -214,7 +213,7 @@ export function VariancePanel({ current, prior, glFlags = [], priorMonth, pacing
                               <td className={`px-4 py-1.5 text-right font-semibold ${unfav ? "text-red-600" : "text-emerald-600"}`}>
                                 {f.variance > 0 ? "+" : ""}{fmtK(f.variance)}
                               </td>
-                              <td className={`px-4 py-1.5 text-right ${unfav ? "text-red-500" : "text-emerald-500"}`}>
+                              <td className={`px-4 py-1.5 text-right ${unfav ? "text-red-600" : "text-emerald-600"}`}>
                                 {f.variance_pct !== null ? fmtPct(f.variance_pct) : "new"}
                               </td>
                               <td className="px-4 py-1.5 text-gray-400 whitespace-nowrap">{f.rule_triggered}</td>

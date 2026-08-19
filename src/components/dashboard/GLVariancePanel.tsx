@@ -1,4 +1,5 @@
 import type { VarianceFlag } from "@/types/dashboard";
+import { formatCurrency } from "@/lib/formatCurrency";
 
 interface Props {
   flags: VarianceFlag[];
@@ -6,9 +7,7 @@ interface Props {
 }
 
 function fmtK(v: number): string {
-  const abs = Math.abs(v);
-  const str = abs >= 1000 ? `$${(abs / 1000).toFixed(1)}K` : `$${Math.round(abs).toLocaleString()}`;
-  return v < 0 ? `(${str})` : str;
+  return formatCurrency(v, { compact: true, zeroDash: false });
 }
 
 function fmtPct(v: number | null): string {

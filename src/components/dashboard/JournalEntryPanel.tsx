@@ -2,15 +2,14 @@
 
 import React, { useState } from "react";
 import type { JournalEntryAccount } from "@/types/dashboard";
+import { formatCurrency } from "@/lib/formatCurrency";
 
 interface Props {
   accounts: JournalEntryAccount[];
 }
 
 function fmtK(v: number): string {
-  const abs = Math.abs(v);
-  const str = abs >= 1000 ? `$${(abs / 1000).toFixed(1)}K` : `$${Math.round(abs).toLocaleString()}`;
-  return v < 0 ? `(${str})` : str;
+  return formatCurrency(v, { compact: true, zeroDash: false });
 }
 
 export function JournalEntryPanel({ accounts }: Props) {

@@ -91,7 +91,7 @@ export function DataDictionary() {
     <>
       <button
         onClick={() => setOpen(true)}
-        className="text-xs text-gray-400 hover:text-gray-600 transition-colors duration-150 cursor-pointer flex items-center gap-1"
+        className="text-xs text-gray-500 hover:text-gray-700 transition-colors duration-150 cursor-pointer flex items-center gap-1"
       >
         <svg width="12" height="12" viewBox="0 0 16 16" fill="currentColor" aria-hidden>
           <path d="M8 0a8 8 0 100 16A8 8 0 008 0zm0 4a1 1 0 110 2 1 1 0 010-2zm0 3a1 1 0 011 1v4a1 1 0 11-2 0V8a1 1 0 011-1z"/>
@@ -134,7 +134,7 @@ export function DataDictionary() {
                     className={[
                       "w-full text-left px-4 py-2 text-xs font-medium transition-colors duration-100 cursor-pointer",
                       i === activeSection
-                        ? "bg-[#fdf2e9] text-[#E07A3E] border-r-2 border-[#E07A3E]"
+                        ? "bg-[#fdf2e9] text-[#F15B27] border-r-2 border-[#F15B27]"
                         : "text-gray-500 hover:text-gray-800 hover:bg-gray-50",
                     ].join(" ")}
                   >

@@ -2,21 +2,14 @@
 
 import { useState } from "react";
 import { FinancialData } from "@/types/dashboard";
+import { formatCurrency, formatMarginPct } from "@/lib/formatCurrency";
 
-function fmtDollar(n: number, acctStyle = true): string {
-  if (n === 0) return "—";
-  const abs = Math.abs(n);
-  const formatted = abs.toLocaleString("en-US", { maximumFractionDigits: 0 });
-  if (n < 0) return acctStyle ? `($${formatted})` : `-$${formatted}`;
-  return `$${formatted}`;
+function fmtDollar(n: number): string {
+  return formatCurrency(n);
 }
 
-function fmtVariance(n: number, acctStyle = true): string {
-  if (n === 0) return "—";
-  const abs = Math.abs(n);
-  const formatted = abs.toLocaleString("en-US", { maximumFractionDigits: 0 });
-  if (n > 0) return `+$${formatted}`;
-  return acctStyle ? `($${formatted})` : `-$${formatted}`;
+function fmtVariance(n: number): string {
+  return formatCurrency(n, { showSign: true });
 }
 
 function fmtRevPct(actual: number | undefined, totalRev: number): string {
@@ -35,14 +28,13 @@ interface RowProps {
   separator?: boolean;
   showRevPct?: boolean;
   totalRev?: number;
-  acctStyle?: boolean;
   pacingFactor?: number;
 }
 
 // Real <tr>/<td> markup — same technical approach as FinancialPacketTab's
 // table, so the two views share one visual language instead of Overview
 // reimplementing column alignment/hover/sticky behavior via CSS grid.
-function Row({ label, actual, budget, prior, indent, bold, isExpense, separator, showRevPct, totalRev = 0, acctStyle = true, pacingFactor = 1 }: RowProps) {
+function Row({ label, actual, budget, prior, indent, bold, isExpense, separator, showRevPct, totalRev = 0, pacingFactor = 1 }: RowProps) {
   const effectiveBudget = budget !== undefined ? budget * pacingFactor : undefined;
   const variance = actual !== undefined && effectiveBudget !== undefined ? actual - effectiveBudget : undefined;
 
@@ -68,22 +60,22 @@ function Row({ label, actual, budget, prior, indent, bold, isExpense, separator,
     <tr className={rowClass}>
       <td className={labelClass}>{label}</td>
       <td className={`${numClass} ${actual !== undefined && actual < 0 ? "text-red-600" : "text-gray-900"}`}>
-        {actual !== undefined ? fmtDollar(actual, acctStyle) : ""}
+        {actual !== undefined ? fmtDollar(actual) : ""}
       </td>
       <td className={`${numClass} text-gray-400`}>
-        {effectiveBudget !== undefined ? fmtDollar(effectiveBudget, acctStyle) : ""}
+        {effectiveBudget !== undefined ? fmtDollar(effectiveBudget) : ""}
       </td>
       <td className={`${numClass} font-medium ${
         variance === undefined || variance === 0
           ? "text-gray-300"
           : varFavorable
           ? "text-emerald-600"
-          : "text-red-500"
+          : "text-red-600"
       }`}>
-        {variance !== undefined ? fmtVariance(variance, acctStyle) : ""}
+        {variance !== undefined ? fmtVariance(variance) : ""}
       </td>
       <td className={`${numClass} text-gray-400`}>
-        {prior !== undefined ? fmtDollar(prior, acctStyle) : ""}
+        {prior !== undefined ? fmtDollar(prior) : ""}
       </td>
       {showRevPct && (
         <td className={`${numClass} text-gray-400`}>
@@ -94,9 +86,9 @@ function Row({ label, actual, budget, prior, indent, bold, isExpense, separator,
   );
 }
 
-function SubtotalRow({ label, actual, budget, prior, isExpense, borderStrength = "single", showRevPct, totalRev = 0, acctStyle = true, pacingFactor = 1 }: {
+function SubtotalRow({ label, actual, budget, prior, isExpense, borderStrength = "single", showRevPct, totalRev = 0, pacingFactor = 1 }: {
   label: string; actual: number; budget: number | null; prior?: number; isExpense?: boolean; borderStrength?: "single" | "double";
-  showRevPct?: boolean; totalRev?: number; acctStyle?: boolean; pacingFactor?: number;
+  showRevPct?: boolean; totalRev?: number; pacingFactor?: number;
 }) {
   const hasBudget = budget !== null;
   const effectiveBudget = hasBudget ? budget * pacingFactor : null;
@@ -106,7 +98,7 @@ function SubtotalRow({ label, actual, budget, prior, isExpense, borderStrength =
 
   const rowClass = [
     "hover:bg-gray-50 transition-colors border-t-2 border-gray-200",
-    isKeyLine ? "bg-gray-50 border-l-2 border-l-[#E07A3E]" : "bg-gray-50/60",
+    isKeyLine ? "bg-gray-50 border-l-2 border-l-[#F15B27]" : "bg-gray-50/60",
   ].join(" ");
 
   const labelClass = `sticky left-0 z-10 px-5 bg-gray-50 text-xs ${isKeyLine ? "py-3 font-bold text-gray-900" : "py-2 font-semibold text-gray-800"}`;
@@ -116,18 +108,18 @@ function SubtotalRow({ label, actual, budget, prior, isExpense, borderStrength =
     <tr className={rowClass}>
       <td className={labelClass}>{label}</td>
       <td className={`${numClass} ${actual < 0 ? "text-red-600" : "text-gray-900"}`}>
-        {fmtDollar(actual, acctStyle)}
+        {fmtDollar(actual)}
       </td>
-      <td className={`${numClass} ${effectiveBudget !== null && effectiveBudget < 0 ? "text-red-400" : "text-gray-400"}`}>
-        {effectiveBudget !== null ? fmtDollar(effectiveBudget, acctStyle) : ""}
+      <td className={`${numClass} ${effectiveBudget !== null && effectiveBudget < 0 ? "text-red-600" : "text-gray-400"}`}>
+        {effectiveBudget !== null ? fmtDollar(effectiveBudget) : ""}
       </td>
       <td className={`${numClass} ${
-        variance === null || variance === 0 ? "text-gray-300" : varFavorable ? "text-emerald-600" : "text-red-500"
+        variance === null || variance === 0 ? "text-gray-300" : varFavorable ? "text-emerald-600" : "text-red-600"
       }`}>
-        {variance !== null ? fmtVariance(variance, acctStyle) : ""}
+        {variance !== null ? fmtVariance(variance) : ""}
       </td>
       <td className={`${numClass} font-normal text-gray-400`}>
-        {prior !== undefined ? fmtDollar(prior, acctStyle) : ""}
+        {prior !== undefined ? fmtDollar(prior) : ""}
       </td>
       {showRevPct && (
         <td className={`${numClass} font-normal text-gray-400`}>
@@ -148,7 +140,6 @@ interface Props {
 
 export function PlTable({ current, prior, pacingPct, bare }: Props) {
   const [showRevPct, setShowRevPct] = useState(false);
-  const [acctStyle, setAcctStyle] = useState(false);
   // Default prorated budget to ON when period is partial month
   const [usePaceBudget, setUsePaceBudget] = useState(() => pacingPct !== null && pacingPct !== undefined && pacingPct < 1);
   // Progressive disclosure: the ~21 indented line items (individual revenue
@@ -169,7 +160,7 @@ export function PlTable({ current, prior, pacingPct, bare }: Props) {
   const budgetLabel = usePaceBudget && pacingPct
     ? `Budget (${Math.round(pacingPct * 100)}% pace)`
     : "Budget (Full Mo.)";
-  const rowProps = { showRevPct, totalRev, acctStyle, pacingFactor };
+  const rowProps = { showRevPct, totalRev, pacingFactor };
 
   return (
     <div className={bare ? "" : "bg-white rounded-lg border border-gray-200 overflow-hidden"}>
@@ -185,7 +176,7 @@ export function PlTable({ current, prior, pacingPct, bare }: Props) {
               className={[
                 "text-xs font-medium px-2 py-0.5 rounded border transition-colors duration-150 cursor-pointer",
                 usePaceBudget
-                  ? "border-[#E07A3E]/40 bg-[#fdf2e9] text-[#E07A3E]"
+                  ? "border-[#F15B27]/40 bg-[#fdf2e9] text-[#F15B27]"
                   : "border-gray-200 text-gray-400 hover:text-gray-600 hover:border-gray-300",
               ].join(" ")}
               title={usePaceBudget ? "Switch to full-month budget" : "Switch to pace-adjusted budget"}
@@ -194,23 +185,11 @@ export function PlTable({ current, prior, pacingPct, bare }: Props) {
             </button>
           )}
           <button
-            onClick={() => setAcctStyle(v => !v)}
-            className={[
-              "text-xs font-medium px-2 py-0.5 rounded border transition-colors duration-150 cursor-pointer",
-              !acctStyle
-                ? "border-[#E07A3E]/40 bg-[#fdf2e9] text-[#E07A3E]"
-                : "border-gray-200 text-gray-400 hover:text-gray-600 hover:border-gray-300",
-            ].join(" ")}
-            title={acctStyle ? "Switch to -$x notation" : "Switch to ($x) accounting notation"}
-          >
-            {acctStyle ? "($x)" : "-$x"}
-          </button>
-          <button
             onClick={() => setShowRevPct(v => !v)}
             className={[
               "text-xs font-medium px-2 py-0.5 rounded border transition-colors duration-150 cursor-pointer",
               showRevPct
-                ? "border-[#E07A3E]/40 bg-[#fdf2e9] text-[#E07A3E]"
+                ? "border-[#F15B27]/40 bg-[#fdf2e9] text-[#F15B27]"
                 : "border-gray-200 text-gray-400 hover:text-gray-600 hover:border-gray-300",
             ].join(" ")}
           >
@@ -270,13 +249,12 @@ export function PlTable({ current, prior, pacingPct, bare }: Props) {
 
           {/* Gross Profit */}
           <SubtotalRow
-            label={`Gross Profit (${is.gross_profit.margin_pct.toFixed(1)}%)`}
+            label={`Gross Profit (${formatMarginPct(is.gross_profit.margin_pct, totalRev)})`}
             actual={is.gross_profit.actual}
             budget={is.gross_profit.budget}
             prior={pi?.gross_profit.actual}
             showRevPct={showRevPct}
             totalRev={totalRev}
-            acctStyle={acctStyle}
             pacingFactor={pacingFactor}
           />
 
@@ -300,14 +278,13 @@ export function PlTable({ current, prior, pacingPct, bare }: Props) {
 
           {/* Net Operating Income */}
           <SubtotalRow
-            label={`Net Operating Income (${is.net_operating_income.margin_pct.toFixed(1)}%)`}
+            label={`Net Operating Income (${formatMarginPct(is.net_operating_income.margin_pct, totalRev)})`}
             actual={is.net_operating_income.actual}
             budget={is.net_operating_income.budget}
             prior={pi?.net_operating_income.actual}
             borderStrength="double"
             showRevPct={showRevPct}
             totalRev={totalRev}
-            acctStyle={acctStyle}
             pacingFactor={pacingFactor}
           />
 
@@ -326,14 +303,13 @@ export function PlTable({ current, prior, pacingPct, bare }: Props) {
 
           {/* Net Income */}
           <SubtotalRow
-            label={`Net Income (${is.net_income.margin_pct.toFixed(1)}%)`}
+            label={`Net Income (${formatMarginPct(is.net_income.margin_pct, totalRev)})`}
             actual={is.net_income.actual}
             budget={null}
             prior={pi?.net_income.actual}
             borderStrength="double"
             showRevPct={showRevPct}
             totalRev={totalRev}
-            acctStyle={acctStyle}
             pacingFactor={1}
           />
         </tbody>

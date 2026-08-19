@@ -37,7 +37,7 @@ export function GLCheckTab({ currentData, priorMonth, uploadedAt, reviewed, revi
     localReviewed ? "text-emerald-600 bg-emerald-50 border-emerald-200"
     : totalIssues === 0 ? "text-emerald-600 bg-emerald-50 border-emerald-200"
     : totalIssues <= 5 ? "text-amber-700 bg-amber-50 border-amber-200"
-    : "text-red-700 bg-red-50 border-red-200";
+    : "text-red-600 bg-red-50 border-red-200";
 
   const statusLabel =
     localReviewed ? "Reviewed"
@@ -88,7 +88,7 @@ export function GLCheckTab({ currentData, priorMonth, uploadedAt, reviewed, revi
               "text-xs font-medium px-3 py-1 rounded border transition-colors duration-150 cursor-pointer whitespace-nowrap disabled:opacity-50 disabled:cursor-wait",
               localReviewed
                 ? "border-gray-200 text-gray-500 hover:text-gray-700 hover:border-gray-300"
-                : "border-[#E07A3E]/40 bg-[#fdf2e9] text-[#E07A3E] hover:bg-[#fbe3ce]",
+                : "border-[#F15B27]/40 bg-[#fdf2e9] text-[#F15B27] hover:bg-[#fbe3ce]",
             ].join(" ")}
           >
             {localReviewed ? "Mark unreviewed" : "Mark reviewed"}
@@ -99,10 +99,10 @@ export function GLCheckTab({ currentData, priorMonth, uploadedAt, reviewed, revi
       {/* Reviewed banner — doesn't hide the underlying data, just acknowledges it was looked at */}
       {localReviewed && (
         <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-2.5 flex items-center gap-2.5">
-          <svg className="w-4 h-4 text-emerald-500 flex-shrink-0" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+          <svg className="w-4 h-4 text-emerald-600 flex-shrink-0" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" d="m4.5 12.75 6 6 9-13.5" />
           </svg>
-          <span className="text-xs text-emerald-800">
+          <span className="text-xs text-emerald-600">
             Reviewed{localReviewedBy ? ` by ${localReviewedBy}` : ""}{localReviewedAt ? ` on ${fmtDate(localReviewedAt)}` : ""} — flags stay visible below, this just clears the alert badge.
           </span>
         </div>
@@ -114,7 +114,7 @@ export function GLCheckTab({ currentData, priorMonth, uploadedAt, reviewed, revi
           data don't compete for the same visual weight. */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
         <div className="bg-gray-50 rounded-lg p-4 text-center">
-          <p className={`text-2xl font-bold ${flagCount === 0 ? "text-emerald-600" : "text-amber-600"}`}>
+          <p className={`text-2xl font-bold ${flagCount === 0 ? "text-emerald-600" : "text-amber-700"}`}>
             {flagCount}
           </p>
           <p className="text-xs text-gray-400 mt-0.5">Variance Flags</p>
@@ -151,14 +151,6 @@ export function GLCheckTab({ currentData, priorMonth, uploadedAt, reviewed, revi
       <GLVariancePanel flags={flags} priorMonth={priorMonth} />
       <ControlViolationsPanel violations={violations} />
       <JournalEntryPanel accounts={jeAccounts} />
-
-      {/* Re-run instructions */}
-      <div className="bg-gray-50 rounded-lg border border-gray-200 px-4 py-3">
-        <p className="text-xs font-medium text-gray-600 mb-1">Re-run GL Check</p>
-        <code className="text-xs text-gray-500 font-mono block">
-          python scripts/month-close/push_to_dashboard.py --location {currentData.location} --month &quot;{currentData.month}&quot; --variances
-        </code>
-      </div>
     </div>
   );
 }

@@ -2,14 +2,10 @@
 
 import type { FinancialData, MonthlyRecord } from "@/types/dashboard";
 import { LOCATIONS, Location } from "@/types/dashboard";
-import { InfoPopover } from "@/components/ui/InfoPopover";
+import { formatCurrency, formatMarginPct } from "@/lib/formatCurrency";
 
 function fmt(n: number): string {
-  if (n === 0) return "—";
-  const abs = Math.abs(n);
-  if (abs >= 1_000_000) return `${n < 0 ? "-" : ""}$${(abs / 1_000_000).toFixed(1)}M`;
-  if (abs >= 1_000) return `${n < 0 ? "-" : ""}$${(abs / 1_000).toFixed(0)}K`;
-  return `${n < 0 ? "-" : ""}$${abs.toFixed(0)}`;
+  return formatCurrency(n, { compact: true });
 }
 
 
@@ -43,49 +39,42 @@ const metrics: {
   label: string;
   bold?: boolean;
   separator?: boolean;
-  info?: { title: string; formula?: string; source?: string; note?: string };
   getValue: (d: FinancialData, records: MonthlyRecord[], currentMonth: string) => CellResult;
 }[] = [
   {
     label: "Revenue",
     bold: true,
-    info: { title: "Total Revenue (MTD)", formula: "Sum of all revenue line items for the period", source: "Yardi Scheduler_Reports" },
     getValue: d => ({ text: fmt(d.income_statement.revenue._total.actual) }),
   },
   {
     label: "Revenue vs Budget",
-    info: { title: "Revenue vs Budget (full-month)", formula: "Revenue − Full-Month Budget", note: "Always compared to the full-month budget, never prorated — most revenue is contractual and posts in full on the 1st." },
     getValue: d => {
       const rev = d.income_statement.revenue._total.actual;
       const bud = d.income_statement.revenue._total.budget;
       if (!bud) return { text: "—" };
       const diff = rev - bud;
-      return { text: `${diff >= 0 ? "+" : "-"}${fmt(Math.abs(diff))}`, color: diff >= 0 ? "text-emerald-600" : "text-red-500" };
+      return { text: formatCurrency(diff, { compact: true, showSign: true }), color: diff >= 0 ? "text-emerald-600" : "text-red-600" };
     },
   },
   {
     label: "GP Margin %",
-    info: { title: "Gross Profit Margin", formula: "Gross Profit ÷ Total Revenue × 100", source: "Computed by build_statements.py" },
-    getValue: d => ({ text: `${d.income_statement.gross_profit.margin_pct.toFixed(1)}%` }),
+    getValue: d => ({ text: formatMarginPct(d.income_statement.gross_profit.margin_pct, d.income_statement.revenue._total.actual) }),
   },
   {
     label: "Total OPEX",
-    info: { title: "Total Operating Expenses", formula: "Payroll + Facilities + Admin + Marketing + Technology + Utilities + Other", source: "Yardi Scheduler_Reports, accounts 6000–6999" },
     getValue: d => ({ text: fmt(d.income_statement.opex._total.actual) }),
   },
   {
     label: "Net Income",
     bold: true,
     separator: true,
-    info: { title: "Net Income", formula: "NOI + Other Income − Other Expenses", source: "Yardi Scheduler_Reports" },
     getValue: d => {
       const ni = d.income_statement.net_income.actual;
-      return { text: fmt(ni), color: ni >= 0 ? "text-emerald-600" : "text-red-500" };
+      return { text: fmt(ni), color: ni >= 0 ? "text-emerald-600" : "text-red-600" };
     },
   },
   {
     label: "Net Income vs Budget",
-    info: { title: "Net Income vs Budget (full-month)", formula: "(MTD NI − Full-Month NI Budget) ÷ |Full NI Budget|", note: "Uses the full-month NI budget — not prorated. The KPI card above prorates to elapsed days; this row shows the raw gap from plan." },
     getValue: d => {
       const ni = d.income_statement.net_income.actual;
       const bud = d.income_statement.net_income.budget;
@@ -98,7 +87,6 @@ const metrics: {
     label: "YTD Revenue",
     bold: false,
     separator: true,
-    info: { title: "Year-to-Date Revenue", formula: "Sum of Revenue across all months in the current calendar year", source: "Computed from monthly_financials records in Supabase" },
     getValue: (_d, records, currentMonth) => {
       const ytd = computeYTD(records, currentMonth);
       return ytd ? { text: fmt(ytd.revenue) } : { text: "—" };
@@ -107,11 +95,10 @@ const metrics: {
   {
     label: "YTD Net Income",
     bold: false,
-    info: { title: "Year-to-Date Net Income", formula: "Sum of Net Income across all months in the current calendar year", source: "Computed from monthly_financials records in Supabase", note: "YTD Net Income accumulates — a single bad month reduces the YTD figure permanently." },
     getValue: (_d, records, currentMonth) => {
       const ytd = computeYTD(records, currentMonth);
       if (!ytd) return { text: "—" };
-      return { text: fmt(ytd.ni), color: ytd.ni >= 0 ? "text-emerald-600" : "text-red-500" };
+      return { text: fmt(ytd.ni), color: ytd.ni >= 0 ? "text-emerald-600" : "text-red-600" };
     },
   },
 ];
@@ -144,10 +131,7 @@ export function LocationSummaryTable({ locationData, selectedMonth }: Props) {
           {metrics.map(metric => (
             <tr key={metric.label} className={`hover:bg-gray-50 ${metric.separator ? "border-t border-gray-200" : ""}`}>
               <td className={`px-4 py-2 text-xs text-gray-600 ${metric.bold ? "font-semibold" : "font-medium"}`}>
-                <span className="flex items-center">
-                  {metric.label}
-                  {metric.info && <InfoPopover {...metric.info} />}
-                </span>
+                {metric.label}
               </td>
               {snapshots.map(({ loc, d, records }) => {
                 if (!d) {
