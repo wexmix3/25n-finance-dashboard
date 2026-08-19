@@ -79,6 +79,57 @@ function buildPeriodTrend(allRecords: MonthlyRecord[], endMonth: string): TrendP
   }));
 }
 
+const MONTH_ORDER = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+function monthSortKeyLocal(m: string): number {
+  const [mon, yearStr] = m.split(" ");
+  const idx = MONTH_ORDER.indexOf(mon);
+  const year = parseInt(yearStr, 10);
+  if (idx === -1 || isNaN(year)) return -Infinity;
+  return year * 12 + idx;
+}
+
+/** Portfolio-level aggregate for the Executive "Consolidated" home — sums
+ * only locations that have a current-period record, so a location that
+ * hasn't uploaded yet doesn't silently zero out the portfolio total. */
+function computePortfolioSnapshot(locationData: Record<Location, LocationData>) {
+  let revenue = 0, ni = 0, niBudget = 0, revenueBudget = 0, locationsWithData = 0;
+  for (const loc of LOCATIONS) {
+    const d = locationData[loc].current?.data;
+    if (!d) continue;
+    locationsWithData++;
+    revenue += d.income_statement.revenue._total.actual;
+    ni += d.income_statement.net_income.actual;
+    niBudget += d.income_statement.net_income.budget;
+    revenueBudget += d.income_statement.revenue._total.budget;
+  }
+  return { revenue, ni, niBudget, revenueBudget, locationsWithData };
+}
+
+/** Portfolio trend — same shape as buildPeriodTrend, summed across all 5
+ * locations per calendar month instead of one location's own history. */
+function computePortfolioTrend(locationData: Record<Location, LocationData>): TrendPoint[] {
+  const byMonth = new Map<string, { revenue: number; gp: number; noi: number }>();
+  for (const loc of LOCATIONS) {
+    for (const r of locationData[loc].allRecords) {
+      const cur = byMonth.get(r.month) ?? { revenue: 0, gp: 0, noi: 0 };
+      cur.revenue += r.data?.income_statement?.revenue?._total?.actual ?? 0;
+      cur.gp += r.data?.income_statement?.gross_profit?.actual ?? 0;
+      cur.noi += r.data?.income_statement?.net_operating_income?.actual ?? 0;
+      byMonth.set(r.month, cur);
+    }
+  }
+  return [...byMonth.entries()]
+    .sort((a, b) => monthSortKeyLocal(a[0]) - monthSortKeyLocal(b[0]))
+    .slice(-12)
+    .map(([month, v]) => ({ month, ...v }));
+}
+
+function fmtExec(n: number): string {
+  const abs = Math.abs(n);
+  const s = abs >= 1_000_000 ? `$${(abs / 1_000_000).toFixed(1)}M` : abs >= 1000 ? `$${(abs / 1000).toFixed(0)}K` : `$${abs.toFixed(0)}`;
+  return n < 0 ? `-${s}` : s;
+}
+
 function NoLocationData({ location, detail }: { location: string; detail: string }) {
   return (
     <div className="bg-white rounded-lg border border-gray-200 p-12 text-center">
@@ -94,7 +145,14 @@ function NoLocationData({ location, detail }: { location: string; detail: string
 }
 
 export function DashboardClient({ locationData, packetData, userEmail, role }: Props) {
-  const [activeTab, setActiveTab] = useState<LocationTab>(LOCATIONS[0]);
+  // Consolidated is the default landing tab — portfolio health first, drill
+  // into a location second, matching how a reader actually approaches "how's
+  // the business doing" rather than starting on one arbitrary location.
+  const [activeTab, setActiveTab] = useState<LocationTab>("Consolidated");
+  // Executive = narrative-first, CEO/board-safe (hero sentence + a few big
+  // numbers, ops signals tucked away). Finance = Christine's existing dense
+  // workflow, completely unchanged. Same underlying data either way.
+  const [viewMode, setViewMode] = useState<"executive" | "finance">("executive");
   const isConsolidated = activeTab === "Consolidated";
   const activeLocation: Location = isConsolidated ? LOCATIONS[0] : activeTab;
   const [selectedMonths, setSelectedMonths] = useState<Partial<Record<Location, string>>>({});
@@ -103,9 +161,6 @@ export function DashboardClient({ locationData, packetData, userEmail, role }: P
   // per-location month pills (which stay independent per tab).
   const [consolidatedMonth, setConsolidatedMonth] = useState<string | null>(null);
   const [activeView, setActiveView] = useState<"overview" | "packet" | "gl" | "occupancy">("overview");
-  // TEMP: Overview layout A/B/C comparison for Christine's pre-demo review —
-  // not a permanent feature, remove once a direction is picked.
-  const [layoutVariant, setLayoutVariant] = useState<"A" | "B" | "C">("A");
   // Instant local override for "mark reviewed" so badges clear immediately
   // without waiting on a full server refetch. Keyed by "location|month".
   const [reviewOverrides, setReviewOverrides] = useState<Record<string, boolean>>({});
@@ -248,6 +303,53 @@ export function DashboardClient({ locationData, packetData, userEmail, role }: P
             <span className="text-sm font-medium text-gray-500">Coworking</span>
           </div>
           <div className="flex items-center gap-4">
+            {/* Executive / Finance — same data, different audience. Default
+                Executive (CEO/board-safe); Christine flips to Finance for
+                her existing full workflow, untouched either way. */}
+            <div className="flex items-center bg-gray-100 rounded-full p-0.5">
+              {(["executive", "finance"] as const).map((m) => (
+                <button
+                  key={m}
+                  onClick={() => setViewMode(m)}
+                  className={`px-3 py-1 text-xs font-semibold rounded-full transition-colors duration-150 cursor-pointer capitalize ${
+                    viewMode === m ? "bg-white text-[#E07A3E] shadow-[0_1px_2px_rgba(0,0,0,0.08)]" : "text-gray-500 hover:text-gray-700"
+                  }`}
+                >
+                  {m}
+                </button>
+              ))}
+            </div>
+
+            {/* Ops/data-health status — one small corner indicator instead
+                of full-width banners competing with the business content.
+                Admin-only signal (GL review counts are an ops concern, not
+                a CEO one); Finance mode still shows its own detailed
+                banners/badges in place, this doesn't replace those. */}
+            {role === "admin" && (() => {
+              const totalGlIssues = LOCATIONS.reduce((sum, loc) => {
+                const d = locationData[loc].current?.data;
+                const reviewKey = locationData[loc].current ? `${loc}|${locationData[loc].current!.month}` : "";
+                const reviewed = reviewOverrides[reviewKey] ?? locationData[loc].current?.gl_reviewed ?? false;
+                if (reviewed) return sum;
+                return sum + (d?.variance_flags?.length ?? 0) + (d?.control_violations?.length ?? 0) + (d?.journal_entry_accounts?.length ?? 0);
+              }, 0);
+              const dotColor = isStale ? "bg-amber-400" : totalGlIssues > 0 ? "bg-amber-400" : "bg-emerald-400";
+              const label = isStale
+                ? `Data ${daysStale}d stale`
+                : totalGlIssues > 0
+                ? `${totalGlIssues} GL issue${totalGlIssues !== 1 ? "s" : ""} to review`
+                : "Data current";
+              return (
+                <div
+                  title={label}
+                  className="hidden sm:flex items-center gap-1.5 px-2 py-1 rounded border border-gray-200 text-[11px] text-gray-500 cursor-default"
+                >
+                  <span className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${dotColor}`} />
+                  {label}
+                </div>
+              );
+            })()}
+
             <span className="text-xs text-gray-400 hidden md:block">{userEmail}</span>
             {role === "admin" && (
               <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-semibold bg-[#fdf2e9] text-[#E07A3E]">
@@ -277,6 +379,64 @@ export function DashboardClient({ locationData, packetData, userEmail, role }: P
 
         {/* Consolidated view — all 5 locations, one shared period selector */}
         {isConsolidated ? (
+          viewMode === "executive" ? (() => {
+            const portfolio = computePortfolioSnapshot(locationData);
+            const portfolioTrend = computePortfolioTrend(locationData);
+            const niVsBudget = portfolio.ni - portfolio.niBudget;
+            const onPace = LOCATIONS.filter(l => healthStatuses[l] === "green").length;
+            const atRisk = LOCATIONS.filter(l => healthStatuses[l] === "yellow").map(l => l);
+            const offTrack = LOCATIONS.filter(l => healthStatuses[l] === "red").map(l => l);
+            const scored = LOCATIONS.filter(l => healthStatuses[l] !== undefined).length;
+            // Lead with the same underlying signal as Finance mode's SummaryBanner,
+            // just as the actual headline instead of a thin bordered strip.
+            const headline = scored === 0
+              ? "Upload financial data to see portfolio performance."
+              : offTrack.length > 0
+              ? `${onPace} of ${scored} locations on pace — ${offTrack.join(", ")} off track${atRisk.length ? `, ${atRisk.join(", ")} at risk` : ""}.`
+              : atRisk.length > 0
+              ? `${onPace} of ${scored} locations on pace — ${atRisk.join(", ")} at risk.`
+              : `All ${scored} locations on pace vs budget.`;
+
+            return (
+              <div className="space-y-5">
+                {/* Hero: portfolio sentence + number, no card chrome */}
+                <div className="pt-1 pb-1">
+                  <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-1">Portfolio · {currentMonth}</p>
+                  <p className={`text-6xl font-bold tracking-tight tabular-nums ${portfolio.ni < 0 ? "text-red-600" : "text-gray-900"}`}>
+                    {fmtExec(portfolio.ni)}
+                  </p>
+                  <p className="text-sm text-gray-600 mt-2 max-w-2xl">{headline}</p>
+                </div>
+
+                {/* Secondary stats — plain inline row, no individual cards */}
+                <div className="flex flex-wrap items-baseline gap-x-8 gap-y-2 py-3 border-y border-gray-200">
+                  <div><span className="text-xs text-gray-400">Revenue: </span><span className="text-sm font-semibold text-gray-800 tabular-nums">{fmtExec(portfolio.revenue)}</span></div>
+                  <div><span className="text-xs text-gray-400">Net Income vs Budget: </span><span className={`text-sm font-semibold tabular-nums ${niVsBudget >= 0 ? "text-emerald-600" : "text-red-600"}`}>{niVsBudget >= 0 ? "+" : "-"}{fmtExec(Math.abs(niVsBudget))}</span></div>
+                  <div><span className="text-xs text-gray-400">Locations reporting: </span><span className="text-sm font-semibold text-gray-800 tabular-nums">{portfolio.locationsWithData} of {LOCATIONS.length}</span></div>
+                </div>
+
+                {portfolioTrend.length > 0 && (
+                  <div className="bg-white rounded-lg border border-gray-200 shadow-sm">
+                    <TrendChart data={portfolioTrend} />
+                  </div>
+                )}
+
+                {/* Drill-down grid — the CEO's second click, not the first thing they see */}
+                <div>
+                  <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">By location</p>
+                  <LocationSummaryTable
+                    locationData={Object.fromEntries(
+                      LOCATIONS.map(loc => [loc, {
+                        current: locationData[loc].current,
+                        allRecords: locationData[loc].allRecords,
+                      }])
+                    ) as Record<Location, { current: MonthlyRecord | null; allRecords: MonthlyRecord[] }>}
+                    selectedMonth={consolidatedMonth}
+                  />
+                </div>
+              </div>
+            );
+          })() : (
           <div className="space-y-3">
             <div className="flex items-center justify-between gap-3 flex-wrap">
               <div>
@@ -302,6 +462,7 @@ export function DashboardClient({ locationData, packetData, userEmail, role }: P
               selectedMonth={consolidatedMonth}
             />
           </div>
+          )
         ) : (
         <>
 
@@ -334,7 +495,7 @@ export function DashboardClient({ locationData, packetData, userEmail, role }: P
                 ].join(" ")}
               >
                 {labels[view]}
-                {view === "gl" && (() => {
+                {view === "gl" && viewMode === "finance" && (() => {
                   const glIssues = (currentData?.variance_flags?.length ?? 0) + (currentData?.control_violations?.length ?? 0) + (currentData?.journal_entry_accounts?.length ?? 0);
                   const reviewKey = current ? `${activeLocation}|${current.month}` : "";
                   const isReviewed = reviewOverrides[reviewKey] ?? current?.gl_reviewed ?? false;
@@ -353,8 +514,8 @@ export function DashboardClient({ locationData, packetData, userEmail, role }: P
           })}
         </div>
 
-        {/* Stale data warning */}
-        {isStale && activeView === "overview" && (
+        {/* Stale data warning — Finance mode only; Executive mode surfaces this via the header corner indicator instead */}
+        {isStale && activeView === "overview" && viewMode === "finance" && (
           <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-2.5 flex items-center gap-2.5">
             <svg className="w-4 h-4 text-amber-500 flex-shrink-0" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126ZM12 15.75h.007v.008H12v-.008Z" />
@@ -370,7 +531,7 @@ export function DashboardClient({ locationData, packetData, userEmail, role }: P
             falls back to "—" and priorMonth to "Prior", which rendered a
             confusing half-populated banner directly above the "No data"
             empty state below. */}
-        {current && (
+        {current && viewMode === "finance" && (
           <PeriodBanner
             currentMonth={currentMonth}
             priorMonth={priorMonth}
@@ -433,25 +594,69 @@ export function DashboardClient({ locationData, packetData, userEmail, role }: P
 
         {/* Overview view */}
         {activeView === "overview" && currentData ? (
-          <>
-            {/* TEMP: layout comparison switcher for pre-demo review — remove once a direction is picked */}
-            <div className="flex items-center justify-end gap-1.5 -mb-2">
-              <span className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider mr-1">Layout preview</span>
-              {(["A", "B", "C"] as const).map((v) => (
-                <button
-                  key={v}
-                  onClick={() => setLayoutVariant(v)}
-                  className={`w-7 h-7 rounded text-xs font-bold border transition-colors duration-150 cursor-pointer ${
-                    layoutVariant === v
-                      ? "bg-[#E07A3E] border-[#E07A3E] text-white"
-                      : "bg-white border-gray-300 text-gray-500 hover:border-gray-400"
-                  }`}
-                >
-                  {v}
-                </button>
-              ))}
-            </div>
+          viewMode === "executive" ? (() => {
+            const is = currentData.income_statement;
+            const ni = is.net_income.actual;
+            const niMargin = is.net_income.margin_pct;
+            const niVsBudget = ni - is.net_income.budget;
+            const heroInsight = currentData.insights?.[0];
+            return (
+              <>
+                {/* Hero: the sentence IS the deliverable, number backs it up
+                    — no card chrome, just typographic weight to establish
+                    what matters most before anything else on the page. */}
+                <div className="pt-2 pb-1">
+                  {heroInsight ? (
+                    <p className="text-lg font-semibold text-gray-900 leading-snug max-w-3xl">{heroInsight}</p>
+                  ) : (
+                    <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-1">Net Income · {currentMonth}</p>
+                  )}
+                  <p className={`font-bold tracking-tight tabular-nums mt-2 ${ni < 0 ? "text-red-600" : "text-gray-900"} ${heroInsight ? "text-4xl" : "text-6xl"}`}>
+                    {fmtExec(ni)}
+                  </p>
+                  <p className="text-sm text-gray-500 mt-1.5">
+                    {niMargin.toFixed(1)}% margin · {niVsBudget >= 0 ? "+" : "-"}{fmtExec(Math.abs(niVsBudget))} vs budget
+                  </p>
+                </div>
 
+                {/* Secondary stats: plain inline row, no individual card
+                    borders — supporting context, not competing for
+                    attention with the hero above. */}
+                <div className="flex flex-wrap items-baseline gap-x-8 gap-y-2 py-3 border-y border-gray-200">
+                  {[
+                    { label: "Revenue", value: fmtExec(is.revenue._total.actual) },
+                    { label: "Gross Profit", value: fmtExec(is.gross_profit.actual) },
+                    { label: "OPEX", value: fmtExec(is.opex._total.actual) },
+                    { label: "NOI", value: fmtExec(is.net_operating_income.actual) },
+                  ].map((s) => (
+                    <div key={s.label}>
+                      <span className="text-xs text-gray-400">{s.label}: </span>
+                      <span className="text-sm font-semibold text-gray-800 tabular-nums">{s.value}</span>
+                    </div>
+                  ))}
+                </div>
+
+                <div className="bg-white rounded-lg border border-gray-200 shadow-sm">
+                  <TrendChart data={periodTrend} />
+                </div>
+
+                {/* Everything else is a click away, not competing for
+                    attention — this is the actual fix for "stuff is all
+                    over the place": one destination for full detail
+                    instead of every table showing simultaneously. */}
+                <button
+                  onClick={() => setViewMode("finance")}
+                  className="w-full flex items-center justify-center gap-1.5 py-3 text-xs font-semibold text-gray-500 hover:text-[#E07A3E] border border-dashed border-gray-300 hover:border-[#E07A3E] rounded-lg transition-colors duration-150 cursor-pointer"
+                >
+                  View full income statement, variance detail & GL check
+                  <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M13.5 4.5 21 12m0 0-7.5 7.5M21 12H3" />
+                  </svg>
+                </button>
+              </>
+            );
+          })() : (
+          <>
             {/* One-sentence business health summary */}
             <SummaryBanner
               healthStatuses={healthStatuses}
@@ -474,138 +679,35 @@ export function DashboardClient({ locationData, packetData, userEmail, role }: P
               </div>
             )}
 
-            {layoutVariant === "A" && (
-              <>
-                {/* KPI row — prorated vs budget */}
-                <IncomeKpiRow
-                  current={currentData}
-                  prior={priorData}
-                  runRateFactor={runRateFactor}
-                  pacingPct={isFullMonth ? null : pacingPct}
-                />
+            {/* KPI row — prorated vs budget */}
+            <IncomeKpiRow
+              current={currentData}
+              prior={priorData}
+              runRateFactor={runRateFactor}
+              pacingPct={isFullMonth ? null : pacingPct}
+            />
 
-                {/* Insights — surfaced early, human-language summary */}
-                {(currentData.insights?.length ?? 0) > 0 && (
-                  <InsightsPanel insights={currentData.insights ?? []} />
-                )}
-
-                {/* P&L table */}
-                <PlTable current={currentData} prior={priorData} pacingPct={isFullMonth ? null : pacingPct} />
-
-                {/* Variance analysis — section-level flags only; account-level detail lives on GL Check */}
-                <VariancePanel
-                  current={currentData}
-                  prior={priorData}
-                  glFlags={[]}
-                  priorMonth={priorMonth}
-                  pacingPct={isFullMonth ? null : pacingPct}
-                />
-
-                {/* Period-aware trend chart */}
-                <TrendChart data={periodTrend} />
-              </>
+            {/* Insights — surfaced early, human-language summary */}
+            {(currentData.insights?.length ?? 0) > 0 && (
+              <InsightsPanel insights={currentData.insights ?? []} />
             )}
 
-            {layoutVariant === "B" && (
-              <>
-                {/* KPI row stays outside the card — these are glanceable stat
-                    tiles (soft shadow, not a bordered "container"), a
-                    different visual language than tables/panels on purpose. */}
-                <IncomeKpiRow
-                  current={currentData}
-                  prior={priorData}
-                  runRateFactor={runRateFactor}
-                  pacingPct={isFullMonth ? null : pacingPct}
-                />
+            {/* P&L table */}
+            <PlTable current={currentData} prior={priorData} pacingPct={isFullMonth ? null : pacingPct} />
 
-                {(currentData.insights?.length ?? 0) > 0 && (
-                  <InsightsPanel insights={currentData.insights ?? []} />
-                )}
+            {/* Variance analysis — section-level flags only; account-level detail lives on GL Check */}
+            <VariancePanel
+              current={currentData}
+              prior={priorData}
+              glFlags={[]}
+              priorMonth={priorMonth}
+              pacingPct={isFullMonth ? null : pacingPct}
+            />
 
-                {/* Consolidated: table + variance analysis share ONE card
-                    instead of two, so a scan down the page hits fewer
-                    separate boxes with their own border/shadow/padding. */}
-                <div className="bg-white rounded-lg border border-gray-200 divide-y divide-gray-200">
-                  <PlTable current={currentData} prior={priorData} pacingPct={isFullMonth ? null : pacingPct} bare />
-                  <VariancePanel
-                    current={currentData}
-                    prior={priorData}
-                    glFlags={[]}
-                    priorMonth={priorMonth}
-                    pacingPct={isFullMonth ? null : pacingPct}
-                    bare
-                  />
-                </div>
-
-                <TrendChart data={periodTrend} />
-              </>
-            )}
-
-            {layoutVariant === "C" && (() => {
-              const is = currentData.income_statement;
-              const ni = is.net_income.actual;
-              const niMargin = is.net_income.margin_pct;
-              const niVsBudget = ni - is.net_income.budget;
-              const heroInsight = currentData.insights?.[0];
-              const fmtHero = (n: number) => {
-                const abs = Math.abs(n);
-                const s = abs >= 1000 ? `$${(abs / 1000).toFixed(0)}K` : `$${abs.toFixed(0)}`;
-                return n < 0 ? `-${s}` : s;
-              };
-              return (
-                <>
-                  {/* Hero: one number, one sentence — no card chrome, just
-                      typographic weight to establish what matters most
-                      before anything else on the page. */}
-                  <div className="pt-2 pb-1">
-                    <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-1">Net Income · {currentMonth}</p>
-                    <p className={`text-6xl font-bold tracking-tight tabular-nums ${ni < 0 ? "text-red-600" : "text-gray-900"}`}>
-                      {fmtHero(ni)}
-                    </p>
-                    <p className="text-sm text-gray-500 mt-1.5">
-                      {niMargin.toFixed(1)}% margin · {niVsBudget >= 0 ? "+" : "-"}{fmtHero(Math.abs(niVsBudget))} vs budget
-                      {heroInsight ? ` — ${heroInsight}` : ""}
-                    </p>
-                  </div>
-
-                  {/* Secondary stats: plain inline row, no individual card
-                      borders — supporting context, not competing for
-                      attention with the hero number above. */}
-                  <div className="flex flex-wrap items-baseline gap-x-8 gap-y-2 py-3 border-y border-gray-200">
-                    {[
-                      { label: "Revenue", value: fmtHero(is.revenue._total.actual) },
-                      { label: "Gross Profit", value: fmtHero(is.gross_profit.actual) },
-                      { label: "OPEX", value: fmtHero(is.opex._total.actual) },
-                      { label: "NOI", value: fmtHero(is.net_operating_income.actual) },
-                    ].map((s) => (
-                      <div key={s.label}>
-                        <span className="text-xs text-gray-400">{s.label}: </span>
-                        <span className="text-sm font-semibold text-gray-800 tabular-nums">{s.value}</span>
-                      </div>
-                    ))}
-                  </div>
-
-                  {/* Full detail — same collapsed-by-default table, single
-                      minimal-chrome card, everything still reachable. */}
-                  <div className="bg-white rounded-lg border border-gray-200">
-                    <PlTable current={currentData} prior={priorData} pacingPct={isFullMonth ? null : pacingPct} bare />
-                  </div>
-
-                  {/* Variance analysis omitted entirely when there's nothing
-                      to review, instead of showing an empty bordered box. */}
-                  <VariancePanel
-                    current={currentData}
-                    prior={priorData}
-                    glFlags={[]}
-                    priorMonth={priorMonth}
-                    pacingPct={isFullMonth ? null : pacingPct}
-                  />
-
-                  <TrendChart data={periodTrend} />
-                </>
-              );
-            })()}
+            {/* Period-aware trend chart */}
+            <TrendChart data={periodTrend} />
           </>
+          )
         ) : activeView === "overview" ? (
           <NoLocationData location={activeLocation} detail="Financial data for this location hasn't been uploaded yet." />
         ) : null}
