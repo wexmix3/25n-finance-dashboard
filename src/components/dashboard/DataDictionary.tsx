@@ -134,7 +134,7 @@ export function DataDictionary() {
                     className={[
                       "w-full text-left px-4 py-2 text-xs font-medium transition-colors duration-100 cursor-pointer",
                       i === activeSection
-                        ? "bg-[#fdf2e9] text-[#E07A3E] border-r-2 border-[#E07A3E]"
+                        ? "bg-[#fdf2e9] text-[#F15B27] border-r-2 border-[#F15B27]"
                         : "text-gray-500 hover:text-gray-800 hover:bg-gray-50",
                     ].join(" ")}
                   >

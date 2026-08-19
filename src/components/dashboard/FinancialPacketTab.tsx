@@ -1,6 +1,7 @@
 "use client";
 
 import type { FinancialData, MonthlyPacket } from "@/types/dashboard";
+import { formatCurrency } from "@/lib/formatCurrency";
 
 interface Props {
   currentData: FinancialData;
@@ -8,13 +9,7 @@ interface Props {
 }
 
 function fmt$(n: number): string {
-  const abs = Math.abs(n);
-  const str = new Intl.NumberFormat("en-US", {
-    style: "currency",
-    currency: "USD",
-    maximumFractionDigits: 0,
-  }).format(abs);
-  return n < 0 ? `(${str})` : str;
+  return formatCurrency(n, { zeroDash: false });
 }
 
 function fmtPct(n: number): string {
@@ -36,7 +31,7 @@ function ISRow({ label, actual, budget, indent, bold, separator, keyLine }: ISRo
   const rowClass = [
     "hover:bg-gray-50 transition-colors",
     separator ? "border-t-2 border-gray-200" : "border-t border-gray-100",
-    keyLine ? "bg-gray-50 border-l-2 border-l-[#E07A3E]" : "",
+    keyLine ? "bg-gray-50 border-l-2 border-l-[#F15B27]" : "",
     bold && !keyLine ? "bg-gray-50/60" : "",
   ].filter(Boolean).join(" ");
 
@@ -94,10 +89,21 @@ function AgingTable({ label, totals }: { label: string; totals: Record<string, n
     { key: "d61_90", label: "61–90 days" },
     { key: "over_90", label: "Over 90" },
   ];
+  const lateCount = buckets.filter(b => (totals[b.key] ?? 0) !== 0).length;
+
   return (
     <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
-      <div className="px-5 py-4 border-b border-gray-200">
+      <div className="px-5 py-4 border-b border-gray-200 flex items-center justify-between">
         <h3 className="text-sm font-bold text-gray-900">{label}</h3>
+        {/* Same pill-badge treatment as GL Check's status pill — small
+            rounded status chip instead of relying on red text alone. */}
+        <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold border ${
+          lateCount === 0
+            ? "text-emerald-600 bg-emerald-50 border-emerald-200"
+            : "text-red-700 bg-red-50 border-red-200"
+        }`}>
+          {lateCount === 0 ? "Current" : `${lateCount} bucket${lateCount !== 1 ? "s" : ""} past due`}
+        </span>
       </div>
       <table className="w-full text-xs">
         <thead>
@@ -168,7 +174,7 @@ export function FinancialPacketTab({ currentData, packet }: Props) {
           className={[
             "inline-flex items-center gap-1.5 px-3 py-1.5 rounded text-xs font-semibold transition-colors duration-150",
             hasPacket
-              ? "bg-[#E07A3E] text-white hover:bg-[#c96c34] cursor-pointer"
+              ? "bg-[#F15B27] text-white hover:bg-[#c96c34] cursor-pointer"
               : "bg-gray-100 text-gray-400 cursor-not-allowed",
           ].join(" ")}
           title={!hasPacket ? "Run build_packet.py --push to unlock PDF generation" : undefined}

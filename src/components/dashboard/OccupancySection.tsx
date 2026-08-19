@@ -1,4 +1,5 @@
 import type { OccupancyData } from "@/types/dashboard";
+import { formatCurrency } from "@/lib/formatCurrency";
 
 interface Props {
   current: OccupancyData | null;
@@ -20,7 +21,7 @@ function deltaInt(curr: number | undefined, prev: number | undefined): string | 
 
 function fmt$(n: number | undefined): string {
   if (n === undefined) return "—";
-  return `$${Math.round(n).toLocaleString()}`;
+  return formatCurrency(n, { zeroDash: false });
 }
 
 export function OccupancySection({ current, prior, expectedMonth }: Props) {

@@ -3,13 +3,10 @@
 import type { FinancialData, MonthlyRecord } from "@/types/dashboard";
 import { LOCATIONS, Location } from "@/types/dashboard";
 import { InfoPopover } from "@/components/ui/InfoPopover";
+import { formatCurrency } from "@/lib/formatCurrency";
 
 function fmt(n: number): string {
-  if (n === 0) return "—";
-  const abs = Math.abs(n);
-  if (abs >= 1_000_000) return `${n < 0 ? "-" : ""}$${(abs / 1_000_000).toFixed(1)}M`;
-  if (abs >= 1_000) return `${n < 0 ? "-" : ""}$${(abs / 1_000).toFixed(0)}K`;
-  return `${n < 0 ? "-" : ""}$${abs.toFixed(0)}`;
+  return formatCurrency(n, { compact: true });
 }
 
 
@@ -60,7 +57,7 @@ const metrics: {
       const bud = d.income_statement.revenue._total.budget;
       if (!bud) return { text: "—" };
       const diff = rev - bud;
-      return { text: `${diff >= 0 ? "+" : "-"}${fmt(Math.abs(diff))}`, color: diff >= 0 ? "text-emerald-600" : "text-red-500" };
+      return { text: formatCurrency(diff, { compact: true, showSign: true }), color: diff >= 0 ? "text-emerald-600" : "text-red-500" };
     },
   },
   {

@@ -1,6 +1,7 @@
 "use client";
 
 import { TrendPoint } from "@/types/dashboard";
+import { formatCurrency } from "@/lib/formatCurrency";
 import {
   AreaChart,
   Area,
@@ -18,9 +19,29 @@ interface Props {
 }
 
 function fmtK(n: number): string {
-  if (n === 0) return "$0";
-  const abs = Math.abs(n);
-  return `${n < 0 ? "-" : ""}$${(abs / 1000).toFixed(0)}K`;
+  return formatCurrency(n, { compact: true, zeroDash: false });
+}
+
+// Current-period emphasis (Reference Inspiration #3): the current/selected
+// month's marker renders solid orange across all three lines, every other
+// month renders as a small pale-gray dot — draws the eye to "now" without a
+// second legend. Line stroke colors are unchanged; this only touches dots.
+function makeDot(lastIndex: number) {
+  return function CurrentPeriodDot(props: { cx?: number; cy?: number; index?: number }) {
+    const { cx, cy, index } = props;
+    if (cx == null || cy == null || index == null) return <g />;
+    const isCurrent = index === lastIndex;
+    return (
+      <circle
+        cx={cx}
+        cy={cy}
+        r={isCurrent ? 5 : 2.5}
+        fill={isCurrent ? "#F15B27" : "#d1d5db"}
+        stroke={isCurrent ? "#ffffff" : "none"}
+        strokeWidth={isCurrent ? 1.5 : 0}
+      />
+    );
+  };
 }
 
 export function TrendChart({ data }: Props) {
@@ -33,6 +54,8 @@ export function TrendChart({ data }: Props) {
   }
 
   const chartData = data;
+  const lastIndex = chartData.length - 1;
+  const currentDot = makeDot(lastIndex);
 
   return (
     <div className="bg-white rounded-lg border border-gray-200 shadow-sm p-4">
@@ -41,8 +64,8 @@ export function TrendChart({ data }: Props) {
         <AreaChart data={chartData} margin={{ top: 8, right: 16, left: 8, bottom: 4 }}>
           <defs>
             <linearGradient id="fillRevenue" x1="0" y1="0" x2="0" y2="1">
-              <stop offset="5%" stopColor="#E07A3E" stopOpacity={0.06}/>
-              <stop offset="95%" stopColor="#E07A3E" stopOpacity={0}/>
+              <stop offset="5%" stopColor="#F15B27" stopOpacity={0.06}/>
+              <stop offset="95%" stopColor="#F15B27" stopOpacity={0}/>
             </linearGradient>
             <linearGradient id="fillGP" x1="0" y1="0" x2="0" y2="1">
               <stop offset="5%" stopColor="#94a3b8" stopOpacity={0.05}/>
@@ -81,11 +104,11 @@ export function TrendChart({ data }: Props) {
           <Area
             type="monotone"
             dataKey="revenue"
-            stroke="#E07A3E"
+            stroke="#F15B27"
             strokeWidth={2.5}
             fill="url(#fillRevenue)"
-            dot={{ r: 3, fill: "#E07A3E", strokeWidth: 0 }}
-            activeDot={{ r: 5 }}
+            dot={currentDot}
+            activeDot={{ r: 6 }}
             name="Revenue"
           />
           <Area
@@ -94,8 +117,8 @@ export function TrendChart({ data }: Props) {
             stroke="#94a3b8"
             strokeWidth={2}
             fill="url(#fillGP)"
-            dot={{ r: 3, fill: "#94a3b8", strokeWidth: 0 }}
-            activeDot={{ r: 5 }}
+            dot={currentDot}
+            activeDot={{ r: 6 }}
             name="Gross Profit"
           />
           <Area
@@ -104,8 +127,8 @@ export function TrendChart({ data }: Props) {
             stroke="#10b981"
             strokeWidth={2}
             fill="url(#fillNOI)"
-            dot={{ r: 3, fill: "#10b981", strokeWidth: 0 }}
-            activeDot={{ r: 5 }}
+            dot={currentDot}
+            activeDot={{ r: 6 }}
             name="NOI"
           />
         </AreaChart>

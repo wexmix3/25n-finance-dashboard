@@ -86,7 +86,7 @@ export function PeriodBanner({ currentMonth, priorMonth, uploadedAt, locked, rol
           {isFull ? (
             <span className="text-xs font-semibold text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded">Final</span>
           ) : (
-            <span className="text-xs font-semibold text-[#E07A3E] bg-[#fdf2e9] px-1.5 py-0.5 rounded">MTD</span>
+            <span className="text-xs font-semibold text-[#F15B27] bg-[#fdf2e9] px-1.5 py-0.5 rounded">MTD</span>
           )}
           {pacing && !isFull && (
             <span className="inline-flex items-center gap-1 text-xs font-semibold text-gray-500 bg-gray-100 px-2 py-0.5 rounded-full">
@@ -159,7 +159,7 @@ export function PeriodBanner({ currentMonth, priorMonth, uploadedAt, locked, rol
             ) : (
               <button
                 onClick={() => setConfirmLock(true)}
-                className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium border border-gray-300 text-gray-500 hover:border-[#E07A3E]/50 hover:text-[#E07A3E] transition-colors duration-150 cursor-pointer"
+                className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium border border-gray-300 text-gray-500 hover:border-[#F15B27]/50 hover:text-[#F15B27] transition-colors duration-150 cursor-pointer"
               >
                 <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" d="M16.5 10.5V6.75a4.5 4.5 0 1 0-9 0v3.75m-.75 11.25h10.5a2.25 2.25 0 0 0 2.25-2.25v-6.75a2.25 2.25 0 0 0-2.25-2.25H6.75a2.25 2.25 0 0 0-2.25 2.25v6.75a2.25 2.25 0 0 0 2.25 2.25Z" />

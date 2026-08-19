@@ -67,7 +67,7 @@ export function PeriodPills({ months, active, onSelect, label = "Period", extraF
             onClick={extraFirstPill.onClick}
             className={[
               "px-2.5 py-1 rounded text-xs font-medium transition-colors duration-150 cursor-pointer flex-shrink-0",
-              extraFirstPill.selected ? "bg-[#E07A3E] text-white" : "bg-gray-100 text-gray-500 hover:bg-gray-200",
+              extraFirstPill.selected ? "bg-[#F15B27] text-white" : "bg-gray-100 text-gray-500 hover:bg-gray-200",
             ].join(" ")}
           >
             {extraFirstPill.label}
@@ -79,7 +79,7 @@ export function PeriodPills({ months, active, onSelect, label = "Period", extraF
             onClick={() => onSelect(month)}
             className={[
               "px-2.5 py-1 rounded text-xs font-medium transition-colors duration-150 cursor-pointer flex-shrink-0",
-              active === month ? "bg-[#E07A3E] text-white" : "bg-gray-100 text-gray-500 hover:bg-gray-200",
+              active === month ? "bg-[#F15B27] text-white" : "bg-gray-100 text-gray-500 hover:bg-gray-200",
             ].join(" ")}
           >
             {month.split(" ")[0]}
