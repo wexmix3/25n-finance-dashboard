@@ -77,14 +77,16 @@ interface Props {
   glFlags?: VarianceFlag[];
   priorMonth: string;
   pacingPct?: number | null;
+  /** Skip the outer card chrome (border/rounding) — for nesting inside a shared container. */
+  bare?: boolean;
 }
 
-export function VariancePanel({ current, prior, glFlags = [], priorMonth, pacingPct }: Props) {
+export function VariancePanel({ current, prior, glFlags = [], priorMonth, pacingPct, bare }: Props) {
   const [showAccountDetail, setShowAccountDetail] = useState(false);
 
   if (!current || !prior) {
     return (
-      <div className="bg-white rounded-lg border border-gray-200 p-4">
+      <div className={bare ? "" : "bg-white rounded-lg border border-gray-200 p-4"}>
         <h3 className="text-sm font-semibold text-gray-900 mb-1">Variance Analysis</h3>
         <p className="text-sm text-gray-400">Prior period data required for variance analysis.</p>
       </div>
@@ -97,7 +99,7 @@ export function VariancePanel({ current, prior, glFlags = [], priorMonth, pacing
   const totalFlags = sectionFlags.length + glFlags.length;
 
   return (
-    <div className="bg-white rounded-lg border border-gray-200">
+    <div className={bare ? "" : "bg-white rounded-lg border border-gray-200"}>
       {/* Header */}
       <div className="px-4 pt-4 pb-3 border-b border-gray-100 flex items-center justify-between">
         <div>

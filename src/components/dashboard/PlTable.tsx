@@ -142,9 +142,11 @@ interface Props {
   current: FinancialData;
   prior?: FinancialData | null;
   pacingPct?: number | null; // null = full month; 0–1 = partial month fraction
+  /** Skip the outer card chrome (border/rounding) — for nesting inside a shared container. */
+  bare?: boolean;
 }
 
-export function PlTable({ current, prior, pacingPct }: Props) {
+export function PlTable({ current, prior, pacingPct, bare }: Props) {
   const [showRevPct, setShowRevPct] = useState(false);
   const [acctStyle, setAcctStyle] = useState(false);
   // Default prorated budget to ON when period is partial month
@@ -170,7 +172,7 @@ export function PlTable({ current, prior, pacingPct }: Props) {
   const rowProps = { showRevPct, totalRev, acctStyle, pacingFactor };
 
   return (
-    <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
+    <div className={bare ? "" : "bg-white rounded-lg border border-gray-200 overflow-hidden"}>
       <div className="flex items-baseline justify-between px-5 py-4 border-b border-gray-200">
         <div>
           <h3 className="text-sm font-bold text-gray-900">Income Statement</h3>
