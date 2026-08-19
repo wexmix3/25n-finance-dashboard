@@ -45,8 +45,8 @@ export function TrendChart({ data }: Props) {
               <stop offset="95%" stopColor="#E07A3E" stopOpacity={0}/>
             </linearGradient>
             <linearGradient id="fillGP" x1="0" y1="0" x2="0" y2="1">
-              <stop offset="5%" stopColor="#6366f1" stopOpacity={0.04}/>
-              <stop offset="95%" stopColor="#6366f1" stopOpacity={0}/>
+              <stop offset="5%" stopColor="#94a3b8" stopOpacity={0.05}/>
+              <stop offset="95%" stopColor="#94a3b8" stopOpacity={0}/>
             </linearGradient>
             <linearGradient id="fillNOI" x1="0" y1="0" x2="0" y2="1">
               <stop offset="5%" stopColor="#10b981" stopOpacity={0.05}/>
@@ -91,10 +91,10 @@ export function TrendChart({ data }: Props) {
           <Area
             type="monotone"
             dataKey="gp"
-            stroke="#6366f1"
+            stroke="#94a3b8"
             strokeWidth={2}
             fill="url(#fillGP)"
-            dot={{ r: 3, fill: "#6366f1", strokeWidth: 0 }}
+            dot={{ r: 3, fill: "#94a3b8", strokeWidth: 0 }}
             activeDot={{ r: 5 }}
             name="Gross Profit"
           />
