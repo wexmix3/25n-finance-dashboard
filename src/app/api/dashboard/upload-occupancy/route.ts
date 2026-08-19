@@ -9,6 +9,33 @@ function isAuthorized(req: NextRequest): boolean {
   return req.headers.get("x-dashboard-key") === key;
 }
 
+export async function GET(request: NextRequest) {
+  if (!isAuthorized(request)) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  const { searchParams } = new URL(request.url);
+  const location = searchParams.get("location");
+  const month = searchParams.get("month");
+  if (!location || !month) {
+    return NextResponse.json({ error: "Missing location or month query param" }, { status: 400 });
+  }
+
+  const supabase = createServiceClient();
+  const { data, error } = await supabase
+    .from("monthly_occupancy")
+    .select("data")
+    .eq("location", location)
+    .eq("month", month)
+    .single();
+
+  if (error || !data) {
+    return NextResponse.json({ error: "not found" }, { status: 404 });
+  }
+
+  return NextResponse.json({ data: data.data });
+}
+
 export async function POST(request: NextRequest) {
   if (!isAuthorized(request)) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
