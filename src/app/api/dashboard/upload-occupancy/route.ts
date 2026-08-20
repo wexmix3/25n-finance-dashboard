@@ -53,7 +53,7 @@ export async function POST(request: NextRequest) {
   const results: { location: string; month: string; status: string }[] = [];
 
   for (const record of records) {
-    const { location, month } = record as { location: string; month: string };
+    const { location, month, lock } = record as { location: string; month: string; lock?: boolean };
     if (!location || !month) {
       results.push({ location: location ?? "?", month: month ?? "?", status: "missing location or month" });
       continue;
@@ -71,11 +71,17 @@ export async function POST(request: NextRequest) {
       continue;
     }
 
+    // `lock` (set only by the month-end closing pull, never the daily live
+    // pull) is written straight through -- once true, the guard above makes
+    // this a one-way door per (location, month). Omitted entirely for
+    // normal pushes so the upsert never resets an existing locked=true back
+    // to false.
+    const row: Record<string, unknown> = { location, month, data: record, uploaded_at: new Date().toISOString() };
+    if (lock) row.locked = true;
+
     const { error } = await supabase
       .from("monthly_occupancy")
-      .upsert({ location, month, data: record, uploaded_at: new Date().toISOString() }, {
-        onConflict: "location,month",
-      });
+      .upsert(row, { onConflict: "location,month" });
 
     results.push({ location, month, status: error ? `error: ${error.message}` : "ok" });
   }
