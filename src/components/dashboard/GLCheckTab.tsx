@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import type { FinancialData, GlItemReview } from "@/types/dashboard";
+import type { FinancialData, GlItemReview, GlItemNote } from "@/types/dashboard";
 import { GLVariancePanel } from "./GLVariancePanel";
 import { ControlViolationsPanel } from "./ControlViolationsPanel";
 import { JournalEntryPanel } from "./JournalEntryPanel";
@@ -16,6 +16,8 @@ interface Props {
   onReviewChange?: (reviewed: boolean) => void;
   /** Already-approved items for this location/month, from gl_item_reviews. */
   itemReviews: GlItemReview[];
+  /** Existing free-text notes for this location/month, from gl_item_notes. */
+  itemNotes: GlItemNote[];
 }
 
 export type ItemType = "variance" | "control" | "je";
@@ -29,12 +31,20 @@ export interface ItemReviewApi {
   toggle: (itemType: ItemType, itemKey: string) => void;
 }
 
+/** Free-text note read/save, same optimistic-update-then-revert-on-failure
+ * shape as ItemReviewApi. Independent of approval — a note can exist on an
+ * item regardless of its approved state. */
+export interface ItemNoteApi {
+  getNote: (itemType: ItemType, itemKey: string) => string;
+  saveNote: (itemType: ItemType, itemKey: string, note: string) => void;
+}
+
 function fmtDate(iso?: string | null): string {
   if (!iso) return "—";
   return new Date(iso).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
 }
 
-export function GLCheckTab({ currentData, priorMonth, uploadedAt, reviewed, reviewedBy, reviewedAt, onReviewChange, itemReviews }: Props) {
+export function GLCheckTab({ currentData, priorMonth, uploadedAt, reviewed, reviewedBy, reviewedAt, onReviewChange, itemReviews, itemNotes }: Props) {
   const [pending, setPending] = useState(false);
   const [localReviewed, setLocalReviewed] = useState(reviewed ?? false);
   const [localReviewedBy, setLocalReviewedBy] = useState(reviewedBy ?? null);
@@ -68,6 +78,35 @@ export function GLCheckTab({ currentData, priorMonth, uploadedAt, reviewed, revi
         }
       }).catch(() => {
         setApprovalOverrides(prev => ({ ...prev, [k]: current }));
+      });
+    },
+  };
+
+  // Same optimistic-override pattern as approvalOverrides above, keyed the
+  // same way. Server notes are the fallback; a local save wins until the
+  // next full page load.
+  const [noteOverrides, setNoteOverrides] = useState<Record<string, string>>({});
+  const serverNotes = new Map(itemNotes.map(n => [`${n.item_type}|${n.item_key}`, n.note]));
+
+  const notesApi: ItemNoteApi = {
+    getNote: (itemType, itemKey) => {
+      const k = `${itemType}|${itemKey}`;
+      return k in noteOverrides ? noteOverrides[k] : (serverNotes.get(k) ?? "");
+    },
+    saveNote: (itemType, itemKey, note) => {
+      const k = `${itemType}|${itemKey}`;
+      const previous = k in noteOverrides ? noteOverrides[k] : (serverNotes.get(k) ?? "");
+      setNoteOverrides(prev => ({ ...prev, [k]: note }));
+      fetch("/api/dashboard/gl-item-note", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ location: currentData.location, month: currentData.month, item_type: itemType, item_key: itemKey, note }),
+      }).then(resp => {
+        if (!resp.ok) {
+          setNoteOverrides(prev => ({ ...prev, [k]: previous }));
+        }
+      }).catch(() => {
+        setNoteOverrides(prev => ({ ...prev, [k]: previous }));
       });
     },
   };
@@ -203,9 +242,9 @@ export function GLCheckTab({ currentData, priorMonth, uploadedAt, reviewed, revi
       )}
 
       {/* Three checks, each answering a different question */}
-      <GLVariancePanel flags={flags} priorMonth={priorMonth} reviewApi={itemReviewApi} />
-      <ControlViolationsPanel violations={violations} reviewApi={itemReviewApi} />
-      <JournalEntryPanel accounts={jeAccounts} reviewApi={itemReviewApi} />
+      <GLVariancePanel flags={flags} priorMonth={priorMonth} reviewApi={itemReviewApi} notesApi={notesApi} />
+      <ControlViolationsPanel violations={violations} reviewApi={itemReviewApi} notesApi={notesApi} />
+      <JournalEntryPanel accounts={jeAccounts} reviewApi={itemReviewApi} notesApi={notesApi} />
     </div>
   );
 }

@@ -4,7 +4,7 @@ import { useState, useSyncExternalStore } from "react";
 import { useRouter } from "next/navigation";
 import { createBrowserSupabaseClient } from "@/lib/supabase/browser";
 import { LOCATIONS, Location } from "@/types/dashboard";
-import type { MonthlyRecord, TrendPoint, FinancialData, OccupancyData, MonthlyPacket, GlItemReview } from "@/types/dashboard";
+import type { MonthlyRecord, TrendPoint, FinancialData, OccupancyData, MonthlyPacket, GlItemReview, GlItemNote } from "@/types/dashboard";
 import { DashboardShell, LocationTab } from "@/components/dashboard/DashboardShell";
 import { PeriodPills } from "@/components/dashboard/PeriodPills";
 import { PeriodBanner } from "@/components/dashboard/PeriodBanner";
@@ -41,6 +41,7 @@ interface Props {
   userEmail: string;
   role: string;
   glItemReviews: GlItemReview[];
+  glItemNotes: GlItemNote[];
 }
 
 function computeLocPacingPct(month: string, uploadedAt: string): number | null {
@@ -224,7 +225,7 @@ function NoLocationData({ location, detail }: { location: string; detail: string
   );
 }
 
-export function DashboardClient({ locationData, packetData, userEmail, role, glItemReviews }: Props) {
+export function DashboardClient({ locationData, packetData, userEmail, role, glItemReviews, glItemNotes }: Props) {
   // Consolidated is the default landing tab — portfolio health first, drill
   // into a location second, matching how a reader actually approaches "how's
   // the business doing" rather than starting on one arbitrary location.
@@ -596,6 +597,7 @@ export function DashboardClient({ locationData, packetData, userEmail, role, glI
                 setReviewOverrides(prev => ({ ...prev, [`${activeLocation}|${current.month}`]: reviewed }))
               }
               itemReviews={glItemReviews.filter(r => r.location === activeLocation && r.month === current.month)}
+              itemNotes={glItemNotes.filter(n => n.location === activeLocation && n.month === current.month)}
             />
           ) : (
             <NoLocationData location={activeLocation} detail="GL data for this location hasn't been uploaded yet." />

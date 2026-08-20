@@ -4,19 +4,23 @@ import React, { useState } from "react";
 import type { JournalEntryAccount } from "@/types/dashboard";
 import { formatCurrency } from "@/lib/formatCurrency";
 import { ItemApproveButton } from "./ItemApproveButton";
-import type { ItemReviewApi } from "./GLCheckTab";
+import { ItemNoteButton } from "./ItemNoteButton";
+import { ItemNoteRow } from "./ItemNoteRow";
+import type { ItemReviewApi, ItemNoteApi } from "./GLCheckTab";
 
 interface Props {
   accounts: JournalEntryAccount[];
   reviewApi: ItemReviewApi;
+  notesApi: ItemNoteApi;
 }
 
 function fmtK(v: number): string {
   return formatCurrency(v, { compact: true, zeroDash: false });
 }
 
-export function JournalEntryPanel({ accounts, reviewApi }: Props) {
+export function JournalEntryPanel({ accounts, reviewApi, notesApi }: Props) {
   const [expanded, setExpanded] = useState<string | null>(null);
+  const [noteOpen, setNoteOpen] = useState<string | null>(null);
 
   if (accounts.length === 0) {
     return (
@@ -72,7 +76,16 @@ export function JournalEntryPanel({ accounts, reviewApi }: Props) {
                     <td className="px-4 py-1.5 text-right text-amber-700 font-semibold">{e.transaction_count}</td>
                     <td className="px-4 py-1.5 text-right text-gray-700">{fmtK(e.total_amount)}</td>
                     <td className="px-4 py-1.5 text-right">
-                      <ItemApproveButton itemType="je" itemKey={e.account} reviewApi={reviewApi} />
+                      <div className="flex items-center justify-end gap-1">
+                        <ItemNoteButton
+                          itemType="je"
+                          itemKey={e.account}
+                          notesApi={notesApi}
+                          isOpen={noteOpen === e.account}
+                          onToggle={() => setNoteOpen(noteOpen === e.account ? null : e.account)}
+                        />
+                        <ItemApproveButton itemType="je" itemKey={e.account} reviewApi={reviewApi} />
+                      </div>
                     </td>
                     <td className="px-4 py-1.5 text-right text-gray-400">
                       <svg className={`w-3 h-3 inline-block transition-transform duration-150 ${isOpen ? "rotate-180" : ""}`} fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
@@ -105,6 +118,9 @@ export function JournalEntryPanel({ accounts, reviewApi }: Props) {
                         </table>
                       </td>
                     </tr>
+                  )}
+                  {noteOpen === e.account && (
+                    <ItemNoteRow itemType="je" itemKey={e.account} notesApi={notesApi} colSpan={6} />
                   )}
                 </React.Fragment>
               );

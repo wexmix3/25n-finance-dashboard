@@ -98,6 +98,19 @@ export interface GlItemReview {
   approved_at: string;
 }
 
+/** Free-text note on a GL Check flagged item, independent of approval status
+ * — a reviewer can leave context without approving. "No entry" and "no note"
+ * are the same state. See migrations/add_gl_item_notes.sql. */
+export interface GlItemNote {
+  location: Location;
+  month: string;
+  item_type: "variance" | "control" | "je";
+  item_key: string;
+  note: string;
+  updated_by: string | null;
+  updated_at: string;
+}
+
 export interface ControlViolation {
   account: string;
   account_name: string;

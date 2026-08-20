@@ -1,7 +1,7 @@
 import { redirect } from "next/navigation";
 import { createServerSupabaseClient, createServiceClient } from "@/lib/supabase/server";
 import { DashboardClient } from "./DashboardClient";
-import type { Location, MonthlyRecord, TrendPoint, OccupancyData, MonthlyPacket, GlItemReview } from "@/types/dashboard";
+import type { Location, MonthlyRecord, TrendPoint, OccupancyData, MonthlyPacket, GlItemReview, GlItemNote } from "@/types/dashboard";
 import { LOCATIONS } from "@/types/dashboard";
 import { normalizeFinancialData } from "@/lib/normalize-financial-data";
 
@@ -143,6 +143,14 @@ export default async function DashboardPage() {
     .select("location, month, item_type, item_key, approved_by, approved_at");
   const glItemReviews: GlItemReview[] = glItemReviewsRaw ?? [];
 
+  // Free-text notes, same up-front-fetch-and-filter-client-side pattern as
+  // glItemReviews above — table only ever holds items someone actually
+  // wrote a note on, so it stays small.
+  const { data: glItemNotesRaw } = await db
+    .from("gl_item_notes")
+    .select("location, month, item_type, item_key, note, updated_by, updated_at");
+  const glItemNotes: GlItemNote[] = glItemNotesRaw ?? [];
+
   return (
     <DashboardClient
       locationData={locationData}
@@ -150,6 +158,7 @@ export default async function DashboardPage() {
       userEmail={user.email ?? ""}
       role={role}
       glItemReviews={glItemReviews}
+      glItemNotes={glItemNotes}
     />
   );
 }

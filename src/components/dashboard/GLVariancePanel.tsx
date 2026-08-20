@@ -4,12 +4,15 @@ import React, { useState } from "react";
 import type { VarianceFlag } from "@/types/dashboard";
 import { formatCurrency } from "@/lib/formatCurrency";
 import { ItemApproveButton } from "./ItemApproveButton";
-import type { ItemReviewApi } from "./GLCheckTab";
+import { ItemNoteButton } from "./ItemNoteButton";
+import { ItemNoteRow } from "./ItemNoteRow";
+import type { ItemReviewApi, ItemNoteApi } from "./GLCheckTab";
 
 interface Props {
   flags: VarianceFlag[];
   priorMonth: string;
   reviewApi: ItemReviewApi;
+  notesApi: ItemNoteApi;
 }
 
 function fmtK(v: number): string {
@@ -26,9 +29,13 @@ function isRevenueAccount(account: string): boolean {
   return account.startsWith("4") || account.startsWith("9");
 }
 
-export function GLVariancePanel({ flags, priorMonth, reviewApi }: Props) {
+export function GLVariancePanel({ flags, priorMonth, reviewApi, notesApi }: Props) {
   // Hooks must run unconditionally — the empty-state early return comes after.
   const [expanded, setExpanded] = useState<string | null>(null);
+  // Separate from `expanded` (transaction detail) on purpose — a reviewer
+  // should be able to read the note and the transaction breakdown at the
+  // same time instead of one collapsing the other.
+  const [noteOpen, setNoteOpen] = useState<string | null>(null);
 
   if (flags.length === 0) {
     return (
@@ -99,7 +106,16 @@ export function GLVariancePanel({ flags, priorMonth, reviewApi }: Props) {
                     </td>
                     <td className="px-4 py-1.5 text-gray-400 whitespace-nowrap">{f.rule_triggered}</td>
                     <td className="px-4 py-1.5 text-right">
-                      <ItemApproveButton itemType="variance" itemKey={f.account} reviewApi={reviewApi} />
+                      <div className="flex items-center justify-end gap-1">
+                        <ItemNoteButton
+                          itemType="variance"
+                          itemKey={f.account}
+                          notesApi={notesApi}
+                          isOpen={noteOpen === f.account}
+                          onToggle={() => setNoteOpen(noteOpen === f.account ? null : f.account)}
+                        />
+                        <ItemApproveButton itemType="variance" itemKey={f.account} reviewApi={reviewApi} />
+                      </div>
                     </td>
                     <td className="px-4 py-1.5 text-right text-gray-400">
                       {hasDetail && (
@@ -134,6 +150,9 @@ export function GLVariancePanel({ flags, priorMonth, reviewApi }: Props) {
                         </table>
                       </td>
                     </tr>
+                  )}
+                  {noteOpen === f.account && (
+                    <ItemNoteRow itemType="variance" itemKey={f.account} notesApi={notesApi} colSpan={9} />
                   )}
                 </React.Fragment>
               );

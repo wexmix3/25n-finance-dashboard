@@ -1,16 +1,19 @@
 "use client";
 
-import { useState } from "react";
+import React, { useState } from "react";
 import type { ControlViolation } from "@/types/dashboard";
 import { formatCurrency } from "@/lib/formatCurrency";
 import { ItemApproveButton } from "./ItemApproveButton";
-import type { ItemReviewApi } from "./GLCheckTab";
+import { ItemNoteButton } from "./ItemNoteButton";
+import { ItemNoteRow } from "./ItemNoteRow";
+import type { ItemReviewApi, ItemNoteApi } from "./GLCheckTab";
 
 const PAGE_SIZE = 25;
 
 interface Props {
   violations: ControlViolation[];
   reviewApi: ItemReviewApi;
+  notesApi: ItemNoteApi;
 }
 
 function violationKey(v: ControlViolation): string {
@@ -32,9 +35,10 @@ const ISSUE_LABEL_FALLBACK: Record<string, string> = {
   inactive_account_has_activity: "Inactive account has activity",
 };
 
-export function ControlViolationsPanel({ violations, reviewApi }: Props) {
+export function ControlViolationsPanel({ violations, reviewApi, notesApi }: Props) {
   // Hooks must run unconditionally — the empty-state early return comes after.
   const [showAll, setShowAll] = useState(false);
+  const [noteOpen, setNoteOpen] = useState<string | null>(null);
 
   if (violations.length === 0) {
     return (
@@ -83,18 +87,33 @@ export function ControlViolationsPanel({ violations, reviewApi }: Props) {
           <tbody className="divide-y divide-gray-50">
             {visible.map((v, i) => {
               const key = violationKey(v);
+              const rowId = `${key}-${i}`;
               const approved = reviewApi.isApproved("control", key);
               return (
-                <tr key={`${v.account}-${v.control}-${i}`} className={`hover:bg-gray-50 ${approved ? "opacity-50" : ""}`}>
-                  <td className="px-4 py-1.5 text-gray-400 font-mono">{v.account}</td>
-                  <td className="px-4 py-1.5 text-gray-700 max-w-[160px] truncate">{v.account_name}</td>
-                  <td className="px-4 py-1.5 text-gray-500 font-mono">{v.control}</td>
-                  <td className="px-4 py-1.5 text-right text-gray-700">{fmtK(v.amount)}</td>
-                  <td className={`px-4 py-1.5 ${approved ? "text-gray-500" : "text-red-600"}`}>{v.message || ISSUE_LABEL_FALLBACK[v.violation_type] || v.violation_type}</td>
-                  <td className="px-4 py-1.5 text-right">
-                    <ItemApproveButton itemType="control" itemKey={key} reviewApi={reviewApi} />
-                  </td>
-                </tr>
+                <React.Fragment key={rowId}>
+                  <tr className={`hover:bg-gray-50 ${approved ? "opacity-50" : ""}`}>
+                    <td className="px-4 py-1.5 text-gray-400 font-mono">{v.account}</td>
+                    <td className="px-4 py-1.5 text-gray-700 max-w-[160px] truncate">{v.account_name}</td>
+                    <td className="px-4 py-1.5 text-gray-500 font-mono">{v.control}</td>
+                    <td className="px-4 py-1.5 text-right text-gray-700">{fmtK(v.amount)}</td>
+                    <td className={`px-4 py-1.5 ${approved ? "text-gray-500" : "text-red-600"}`}>{v.message || ISSUE_LABEL_FALLBACK[v.violation_type] || v.violation_type}</td>
+                    <td className="px-4 py-1.5 text-right">
+                      <div className="flex items-center justify-end gap-1">
+                        <ItemNoteButton
+                          itemType="control"
+                          itemKey={key}
+                          notesApi={notesApi}
+                          isOpen={noteOpen === rowId}
+                          onToggle={() => setNoteOpen(noteOpen === rowId ? null : rowId)}
+                        />
+                        <ItemApproveButton itemType="control" itemKey={key} reviewApi={reviewApi} />
+                      </div>
+                    </td>
+                  </tr>
+                  {noteOpen === rowId && (
+                    <ItemNoteRow itemType="control" itemKey={key} notesApi={notesApi} colSpan={6} />
+                  )}
+                </React.Fragment>
               );
             })}
           </tbody>
