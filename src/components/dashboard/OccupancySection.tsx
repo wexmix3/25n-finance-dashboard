@@ -130,20 +130,14 @@ export function OccupancySection({ current, prior, expectedMonth, history }: Pro
   const occDelta = occupancyDeltaLabel(current.occupancy_pct ?? undefined, prior?.occupancy_pct ?? undefined);
   const memberDelta = deltaInt(current.total_members ?? undefined, prior?.total_members ?? undefined);
 
-  const utilization =
-    current.booked_desks != null && current.available_desks != null && current.available_desks > 0
-      ? Math.round((current.booked_desks / current.available_desks) * 100)
-      : null;
-  const priorUtilization =
-    prior?.booked_desks != null && prior?.available_desks != null && prior.available_desks > 0
-      ? Math.round((prior.booked_desks / prior.available_desks) * 100)
-      : null;
-  // Utilization previously showed no MoM comparison at all while every
-  // sibling stat had one, so its absolute-level red/amber/green coloring
-  // read as arbitrary next to Occupancy's neutral black at the same value
-  // (Round 3 UX audit, 2026-08-19). Giving it the same delta line the others
-  // get makes the color legible as "low and worth watching," not random.
-  const utilizationDelta = deltaInt(utilization ?? undefined, priorUtilization ?? undefined);
+  // Only the five space types that factor into occupancy_pct (Christine
+  // confirmed 2026-08-17, see parse_kube_api_occupancy.py CORE_TYPE_PREFIXES)
+  // — Day Office and Meeting Rooms are excluded from the ratio, so showing
+  // them here read as a competing number that didn't roll up into the total.
+  const CORE_TYPE_PREFIXES = ["Dedicated Desk", "Private Office", "Full Floor Office", "Office Suite", "Team Office"];
+  const coreSpaceBreakdown = current.raw.space_breakdown?.filter((sb) =>
+    CORE_TYPE_PREFIXES.some((prefix) => sb.space_type.startsWith(prefix))
+  );
 
   return (
     <div className="bg-white rounded-lg border border-gray-200">
@@ -200,27 +194,10 @@ export function OccupancySection({ current, prior, expectedMonth, history }: Pro
           </p>
           <p className="text-xs text-gray-400 mt-0.5">this period</p>
         </div>
-
-        {/* Utilization rate (computed) */}
-        {utilization != null && (
-          <div>
-            <p className="text-xs text-gray-400 mb-0.5">Utilization</p>
-            <p className={`text-2xl font-semibold ${utilization >= 80 ? "text-emerald-600" : utilization >= 60 ? "text-amber-700" : "text-red-600"}`}>
-              {utilization}%
-            </p>
-            {utilizationDelta ? (
-              <p className={`text-xs mt-0.5 ${utilizationDelta.startsWith("+") ? "text-emerald-600" : "text-red-600"}`}>
-                {utilizationDelta} MoM
-              </p>
-            ) : (
-              <p className="text-xs text-gray-400 mt-0.5">booked / available</p>
-            )}
-          </div>
-        )}
       </div>
 
       {/* YTD + space-type breakdown */}
-      {(current.raw.ytd_occupancy_pct != null || (current.raw.space_breakdown?.length ?? 0) > 0) && (
+      {(current.raw.ytd_occupancy_pct != null || (coreSpaceBreakdown?.length ?? 0) > 0) && (
         <div className="px-4 pb-4 pt-1 border-t border-gray-100">
           <div className="flex items-center gap-6 mb-2 mt-3">
             {current.raw.ytd_occupancy_pct != null && (
@@ -234,9 +211,9 @@ export function OccupancySection({ current, prior, expectedMonth, history }: Pro
               </p>
             )}
           </div>
-          {(current.raw.space_breakdown?.length ?? 0) > 0 && (
+          {(coreSpaceBreakdown?.length ?? 0) > 0 && (
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 mt-2">
-              {current.raw.space_breakdown!.map((sb) => (
+              {coreSpaceBreakdown!.map((sb) => (
                 <div key={sb.space_type} className="rounded border border-gray-100 bg-gray-50 px-2.5 py-2">
                   <p className="text-[11px] text-gray-500">{sb.space_type}</p>
                   <p className="text-sm font-semibold text-gray-800 tabular-nums">
