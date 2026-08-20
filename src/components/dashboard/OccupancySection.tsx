@@ -35,14 +35,16 @@ function fmt$(n: number | undefined): string {
   return formatCurrency(n, { zeroDash: false });
 }
 
-function OccupancyTrendChart({ history }: { history: { month: string; occupancy_pct: number | null }[] }) {
+/** Exported for reuse by the Consolidated Overview's portfolio-wide
+ * occupancy trend (Christine's 2026-08-19 "historical occupancies" ask). */
+export function OccupancyTrendChart({ history, title = "6-Month Occupancy Trend" }: { history: { month: string; occupancy_pct: number | null }[]; title?: string }) {
   const chartData = history.filter(h => h.occupancy_pct != null);
   if (chartData.length < 2) return null;
   const lastIndex = chartData.length - 1;
 
   return (
     <div className="px-4 pb-4 pt-3 border-t border-gray-100">
-      <p className="text-xs font-semibold text-gray-500 mb-2">6-Month Occupancy Trend</p>
+      <p className="text-xs font-semibold text-gray-500 mb-2">{title}</p>
       <ResponsiveContainer width="100%" height={160} debounce={200}>
         <AreaChart data={chartData} margin={{ top: 4, right: 12, left: 0, bottom: 0 }}>
           <defs>

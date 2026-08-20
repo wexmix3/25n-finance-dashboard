@@ -46,7 +46,7 @@ function makeDot(lastIndex: number) {
 
 const LEGEND_ITEMS = [
   { label: "Revenue", color: "#F15B27" },
-  { label: "NOI", color: "#10b981" },
+  { label: "Net Income", color: "#10b981" },
 ];
 
 function renderLegend() {
@@ -77,7 +77,7 @@ export function TrendChart({ data }: Props) {
 
   return (
     <div className="bg-white rounded-lg border border-gray-200 shadow-sm p-4">
-      <h3 className="text-sm font-bold text-gray-900 mb-4">Revenue & NOI Trend</h3>
+      <h3 className="text-sm font-bold text-gray-900 mb-4">Revenue & Net Income Trend</h3>
       <ResponsiveContainer width="100%" height={360} debounce={200}>
         <AreaChart data={chartData} margin={{ top: 8, right: 16, left: 8, bottom: 4 }}>
           <defs>
@@ -85,7 +85,7 @@ export function TrendChart({ data }: Props) {
               <stop offset="5%" stopColor="#F15B27" stopOpacity={0.06}/>
               <stop offset="95%" stopColor="#F15B27" stopOpacity={0}/>
             </linearGradient>
-            <linearGradient id="fillNOI" x1="0" y1="0" x2="0" y2="1">
+            <linearGradient id="fillNI" x1="0" y1="0" x2="0" y2="1">
               <stop offset="5%" stopColor="#10b981" stopOpacity={0.05}/>
               <stop offset="95%" stopColor="#10b981" stopOpacity={0}/>
             </linearGradient>
@@ -133,13 +133,13 @@ export function TrendChart({ data }: Props) {
           />
           <Area
             type="monotone"
-            dataKey="noi"
+            dataKey="ni"
             stroke="#10b981"
             strokeWidth={2}
-            fill="url(#fillNOI)"
+            fill="url(#fillNI)"
             dot={currentDot}
             activeDot={{ r: 6 }}
-            name="NOI"
+            name="Net Income"
           />
         </AreaChart>
       </ResponsiveContainer>

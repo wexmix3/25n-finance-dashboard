@@ -51,7 +51,7 @@ function buildSectionFlags(current: FinancialData, prior: FinancialData): Sectio
     { label: "Utilities",           curr: is.opex.utilities.actual,            prev: ip.opex.utilities.actual,            isRevenue: false },
     { label: "Admin / Legal",       curr: is.opex.admin_legal.actual,          prev: ip.opex.admin_legal.actual,          isRevenue: false },
     { label: "Total OPEX",          curr: is.opex._total.actual,               prev: ip.opex._total.actual,               isRevenue: false },
-    { label: "Net Op. Income",      curr: is.net_operating_income.actual,      prev: ip.net_operating_income.actual,      isRevenue: true },
+    { label: "Net Income",          curr: is.net_income.actual,                prev: ip.net_income.actual,                isRevenue: true },
   ];
 
   return sections

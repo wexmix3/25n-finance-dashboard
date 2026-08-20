@@ -3,11 +3,18 @@
 import { useState } from "react";
 import type { ControlViolation } from "@/types/dashboard";
 import { formatCurrency } from "@/lib/formatCurrency";
+import { ItemApproveButton } from "./ItemApproveButton";
+import type { ItemReviewApi } from "./GLCheckTab";
 
 const PAGE_SIZE = 25;
 
 interface Props {
   violations: ControlViolation[];
+  reviewApi: ItemReviewApi;
+}
+
+function violationKey(v: ControlViolation): string {
+  return `${v.account}|${v.control}|${v.amount}`;
 }
 
 function fmtK(v: number): string {
@@ -25,7 +32,7 @@ const ISSUE_LABEL_FALLBACK: Record<string, string> = {
   inactive_account_has_activity: "Inactive account has activity",
 };
 
-export function ControlViolationsPanel({ violations }: Props) {
+export function ControlViolationsPanel({ violations, reviewApi }: Props) {
   // Hooks must run unconditionally — the empty-state early return comes after.
   const [showAll, setShowAll] = useState(false);
 
@@ -70,18 +77,26 @@ export function ControlViolationsPanel({ violations }: Props) {
               <th className="px-4 py-2 text-left font-medium text-gray-400 uppercase tracking-wide">Control #</th>
               <th className="px-4 py-2 text-right font-medium text-gray-400 uppercase tracking-wide">Amount</th>
               <th className="px-4 py-2 text-left font-medium text-gray-400 uppercase tracking-wide">Issue</th>
+              <th className="px-4 py-2 w-24" />
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-50">
-            {visible.map((v, i) => (
-              <tr key={`${v.account}-${v.control}-${i}`} className="hover:bg-gray-50">
-                <td className="px-4 py-1.5 text-gray-400 font-mono">{v.account}</td>
-                <td className="px-4 py-1.5 text-gray-700 max-w-[160px] truncate">{v.account_name}</td>
-                <td className="px-4 py-1.5 text-gray-500 font-mono">{v.control}</td>
-                <td className="px-4 py-1.5 text-right text-gray-700">{fmtK(v.amount)}</td>
-                <td className="px-4 py-1.5 text-red-600">{v.message || ISSUE_LABEL_FALLBACK[v.violation_type] || v.violation_type}</td>
-              </tr>
-            ))}
+            {visible.map((v, i) => {
+              const key = violationKey(v);
+              const approved = reviewApi.isApproved("control", key);
+              return (
+                <tr key={`${v.account}-${v.control}-${i}`} className={`hover:bg-gray-50 ${approved ? "opacity-50" : ""}`}>
+                  <td className="px-4 py-1.5 text-gray-400 font-mono">{v.account}</td>
+                  <td className="px-4 py-1.5 text-gray-700 max-w-[160px] truncate">{v.account_name}</td>
+                  <td className="px-4 py-1.5 text-gray-500 font-mono">{v.control}</td>
+                  <td className="px-4 py-1.5 text-right text-gray-700">{fmtK(v.amount)}</td>
+                  <td className={`px-4 py-1.5 ${approved ? "text-gray-500" : "text-red-600"}`}>{v.message || ISSUE_LABEL_FALLBACK[v.violation_type] || v.violation_type}</td>
+                  <td className="px-4 py-1.5 text-right">
+                    <ItemApproveButton itemType="control" itemKey={key} reviewApi={reviewApi} />
+                  </td>
+                </tr>
+              );
+            })}
           </tbody>
         </table>
       </div>

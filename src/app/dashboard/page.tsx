@@ -1,7 +1,7 @@
 import { redirect } from "next/navigation";
 import { createServerSupabaseClient, createServiceClient } from "@/lib/supabase/server";
 import { DashboardClient } from "./DashboardClient";
-import type { Location, MonthlyRecord, TrendPoint, OccupancyData, MonthlyPacket } from "@/types/dashboard";
+import type { Location, MonthlyRecord, TrendPoint, OccupancyData, MonthlyPacket, GlItemReview } from "@/types/dashboard";
 import { LOCATIONS } from "@/types/dashboard";
 import { normalizeFinancialData } from "@/lib/normalize-financial-data";
 
@@ -90,6 +90,7 @@ export default async function DashboardPage() {
         revenue: r.data?.income_statement?.revenue?._total?.actual ?? 0,
         gp: r.data?.income_statement?.gross_profit?.actual ?? 0,
         noi: r.data?.income_statement?.net_operating_income?.actual ?? 0,
+        ni: r.data?.income_statement?.net_income?.actual ?? 0,
       }));
 
     const locOccupancy = (occupancyRecords ?? []).filter((r: { location: string }) => r.location === loc);
@@ -133,12 +134,22 @@ export default async function DashboardPage() {
 
   const role = profile?.role ?? "viewer";
 
+  // Per-item approve/keep-flagged status (GL Check panels). Table is small
+  // (only ever holds explicitly-approved items — see migration comment), so
+  // fetching everything up front and filtering client-side by
+  // location/month/item_type is simpler than a query per panel render.
+  const { data: glItemReviewsRaw } = await db
+    .from("gl_item_reviews")
+    .select("location, month, item_type, item_key, approved_by, approved_at");
+  const glItemReviews: GlItemReview[] = glItemReviewsRaw ?? [];
+
   return (
     <DashboardClient
       locationData={locationData}
       packetData={packetData}
       userEmail={user.email ?? ""}
       role={role}
+      glItemReviews={glItemReviews}
     />
   );
 }

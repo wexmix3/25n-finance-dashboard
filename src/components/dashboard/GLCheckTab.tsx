@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import type { FinancialData } from "@/types/dashboard";
+import type { FinancialData, GlItemReview } from "@/types/dashboard";
 import { GLVariancePanel } from "./GLVariancePanel";
 import { ControlViolationsPanel } from "./ControlViolationsPanel";
 import { JournalEntryPanel } from "./JournalEntryPanel";
@@ -14,6 +14,19 @@ interface Props {
   reviewedBy?: string | null;
   reviewedAt?: string | null;
   onReviewChange?: (reviewed: boolean) => void;
+  /** Already-approved items for this location/month, from gl_item_reviews. */
+  itemReviews: GlItemReview[];
+}
+
+export type ItemType = "variance" | "control" | "je";
+
+/** Shared approve/keep-flagged handle passed to all three flagged-item
+ * panels. Reversible by construction (Christine's 2026-08-19 ask) — the
+ * same toggle call approves or un-approves depending on current state, and
+ * the API route upserts or deletes accordingly. */
+export interface ItemReviewApi {
+  isApproved: (itemType: ItemType, itemKey: string) => boolean;
+  toggle: (itemType: ItemType, itemKey: string) => void;
 }
 
 function fmtDate(iso?: string | null): string {
@@ -21,17 +34,59 @@ function fmtDate(iso?: string | null): string {
   return new Date(iso).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
 }
 
-export function GLCheckTab({ currentData, priorMonth, uploadedAt, reviewed, reviewedBy, reviewedAt, onReviewChange }: Props) {
+export function GLCheckTab({ currentData, priorMonth, uploadedAt, reviewed, reviewedBy, reviewedAt, onReviewChange, itemReviews }: Props) {
   const [pending, setPending] = useState(false);
   const [localReviewed, setLocalReviewed] = useState(reviewed ?? false);
   const [localReviewedBy, setLocalReviewedBy] = useState(reviewedBy ?? null);
   const [localReviewedAt, setLocalReviewedAt] = useState(reviewedAt ?? null);
 
+  // Optimistic local overrides, keyed "itemType|itemKey" -> approved. Falls
+  // back to the server-provided itemReviews when a key has no override yet.
+  const [approvalOverrides, setApprovalOverrides] = useState<Record<string, boolean>>({});
+
+  const serverApprovedKeys = new Set(itemReviews.map(r => `${r.item_type}|${r.item_key}`));
+
+  const itemReviewApi: ItemReviewApi = {
+    isApproved: (itemType, itemKey) => {
+      const k = `${itemType}|${itemKey}`;
+      return k in approvalOverrides ? approvalOverrides[k] : serverApprovedKeys.has(k);
+    },
+    toggle: (itemType, itemKey) => {
+      const k = `${itemType}|${itemKey}`;
+      const current = k in approvalOverrides ? approvalOverrides[k] : serverApprovedKeys.has(k);
+      const next = !current;
+      setApprovalOverrides(prev => ({ ...prev, [k]: next }));
+      fetch("/api/dashboard/gl-item-review", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ location: currentData.location, month: currentData.month, item_type: itemType, item_key: itemKey, approved: next }),
+      }).then(resp => {
+        if (!resp.ok) {
+          // Revert on failure — never leave the UI claiming a state the
+          // server didn't actually persist.
+          setApprovalOverrides(prev => ({ ...prev, [k]: current }));
+        }
+      }).catch(() => {
+        setApprovalOverrides(prev => ({ ...prev, [k]: current }));
+      });
+    },
+  };
+
   const flags = currentData.variance_flags ?? [];
   const violations = currentData.control_violations ?? [];
   const jeAccounts = currentData.journal_entry_accounts ?? [];
-  const flagCount = flags.length;
-  const totalIssues = flagCount + violations.length + jeAccounts.length;
+
+  const unapprovedCount = (itemType: ItemType, keys: string[]) =>
+    keys.filter(k => !itemReviewApi.isApproved(itemType, k)).length;
+
+  const flagKeys = flags.map(f => f.account);
+  const violationKeys = violations.map(v => `${v.account}|${v.control}|${v.amount}`);
+  const jeKeys = jeAccounts.map(a => a.account);
+
+  const flagCount = unapprovedCount("variance", flagKeys);
+  const violationCount = unapprovedCount("control", violationKeys);
+  const jeCount = unapprovedCount("je", jeKeys);
+  const totalIssues = flagCount + violationCount + jeCount;
 
   const statusColor =
     localReviewed ? "text-emerald-600 bg-emerald-50 border-emerald-200"
@@ -109,9 +164,9 @@ export function GLCheckTab({ currentData, priorMonth, uploadedAt, reviewed, revi
       )}
 
       {/* Stat chips — three distinct checks, each answers a different question.
-          Flat, borderless tiles (not the bordered white "container" cards
-          used for the tables below) so the headline counts and the detailed
-          data don't compete for the same visual weight. */}
+          Counts reflect items still awaiting review — approving an item
+          (see itemReviewApi below) drops it from these counts, so the
+          headline number tracks real remaining work. */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
         <div className="bg-gray-50 rounded-lg p-4 text-center">
           <p className={`text-2xl font-bold ${flagCount === 0 ? "text-emerald-600" : "text-amber-700"}`}>
@@ -120,14 +175,14 @@ export function GLCheckTab({ currentData, priorMonth, uploadedAt, reviewed, revi
           <p className="text-xs text-gray-400 mt-0.5">Variance Flags</p>
         </div>
         <div className="bg-gray-50 rounded-lg p-4 text-center">
-          <p className={`text-2xl font-bold ${violations.length === 0 ? "text-emerald-600" : "text-red-600"}`}>
-            {violations.length}
+          <p className={`text-2xl font-bold ${violationCount === 0 ? "text-emerald-600" : "text-red-600"}`}>
+            {violationCount}
           </p>
           <p className="text-xs text-gray-400 mt-0.5">Control # Issues</p>
         </div>
         <div className="bg-gray-50 rounded-lg p-4 text-center">
-          <p className={`text-2xl font-bold ${jeAccounts.length === 0 ? "text-emerald-600" : "text-amber-700"}`}>
-            {jeAccounts.length}
+          <p className={`text-2xl font-bold ${jeCount === 0 ? "text-emerald-600" : "text-amber-700"}`}>
+            {jeCount}
           </p>
           <p className="text-xs text-gray-400 mt-0.5">Needs JE Review</p>
         </div>
@@ -148,9 +203,9 @@ export function GLCheckTab({ currentData, priorMonth, uploadedAt, reviewed, revi
       )}
 
       {/* Three checks, each answering a different question */}
-      <GLVariancePanel flags={flags} priorMonth={priorMonth} />
-      <ControlViolationsPanel violations={violations} />
-      <JournalEntryPanel accounts={jeAccounts} />
+      <GLVariancePanel flags={flags} priorMonth={priorMonth} reviewApi={itemReviewApi} />
+      <ControlViolationsPanel violations={violations} reviewApi={itemReviewApi} />
+      <JournalEntryPanel accounts={jeAccounts} reviewApi={itemReviewApi} />
     </div>
   );
 }

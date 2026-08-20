@@ -4,7 +4,7 @@ import { useState, useSyncExternalStore } from "react";
 import { useRouter } from "next/navigation";
 import { createBrowserSupabaseClient } from "@/lib/supabase/browser";
 import { LOCATIONS, Location } from "@/types/dashboard";
-import type { MonthlyRecord, TrendPoint, FinancialData, OccupancyData, MonthlyPacket } from "@/types/dashboard";
+import type { MonthlyRecord, TrendPoint, FinancialData, OccupancyData, MonthlyPacket, GlItemReview } from "@/types/dashboard";
 import { DashboardShell, LocationTab } from "@/components/dashboard/DashboardShell";
 import { PeriodPills } from "@/components/dashboard/PeriodPills";
 import { PeriodBanner } from "@/components/dashboard/PeriodBanner";
@@ -12,7 +12,7 @@ import { IncomeKpiRow } from "@/components/dashboard/IncomeKpiRow";
 import { InsightPanel } from "@/components/dashboard/InsightPanel";
 import { PlTable } from "@/components/dashboard/PlTable";
 import { TrendChart } from "@/components/dashboard/TrendChart";
-import { OccupancySection, occupancyDeltaLabel } from "@/components/dashboard/OccupancySection";
+import { OccupancySection, occupancyDeltaLabel, OccupancyTrendChart } from "@/components/dashboard/OccupancySection";
 import { VariancePanel } from "@/components/dashboard/VariancePanel";
 import { LocationSummaryTable } from "@/components/dashboard/LocationSummaryTable";
 import { DataDictionary } from "@/components/dashboard/DataDictionary";
@@ -40,6 +40,7 @@ interface Props {
   packetData: Record<Location, MonthlyPacket | null>;
   userEmail: string;
   role: string;
+  glItemReviews: GlItemReview[];
 }
 
 function computeLocPacingPct(month: string, uploadedAt: string): number | null {
@@ -91,6 +92,7 @@ function buildPeriodTrend(allRecords: MonthlyRecord[], endMonth: string): TrendP
     revenue: r.data?.income_statement?.revenue?._total?.actual ?? 0,
     gp: r.data?.income_statement?.gross_profit?.actual ?? 0,
     noi: r.data?.income_statement?.net_operating_income?.actual ?? 0,
+    ni: r.data?.income_statement?.net_income?.actual ?? 0,
   }));
 }
 
@@ -106,10 +108,11 @@ function monthSortKeyLocal(m: string): number {
 /** Portfolio-level aggregate for the Consolidated home — sums only
  * locations that have a current-period record, so a location that hasn't
  * uploaded yet doesn't silently zero out the portfolio total. */
-function computePortfolioSnapshot(locationData: Record<Location, LocationData>) {
+function computePortfolioSnapshot(locationData: Record<Location, LocationData>, month: string | null) {
   let revenue = 0, ni = 0, niBudget = 0, revenueBudget = 0, locationsWithData = 0;
   for (const loc of LOCATIONS) {
-    const d = locationData[loc].current?.data;
+    const rec = month ? locationData[loc].allRecords.find(r => r.month === month) : locationData[loc].current;
+    const d = rec?.data;
     if (!d) continue;
     locationsWithData++;
     revenue += d.income_statement.revenue._total.actual;
@@ -123,13 +126,14 @@ function computePortfolioSnapshot(locationData: Record<Location, LocationData>) 
 /** Portfolio trend — same shape as buildPeriodTrend, summed across all 5
  * locations per calendar month instead of one location's own history. */
 function computePortfolioTrend(locationData: Record<Location, LocationData>): TrendPoint[] {
-  const byMonth = new Map<string, { revenue: number; gp: number; noi: number }>();
+  const byMonth = new Map<string, { revenue: number; gp: number; noi: number; ni: number }>();
   for (const loc of LOCATIONS) {
     for (const r of locationData[loc].allRecords) {
-      const cur = byMonth.get(r.month) ?? { revenue: 0, gp: 0, noi: 0 };
+      const cur = byMonth.get(r.month) ?? { revenue: 0, gp: 0, noi: 0, ni: 0 };
       cur.revenue += r.data?.income_statement?.revenue?._total?.actual ?? 0;
       cur.gp += r.data?.income_statement?.gross_profit?.actual ?? 0;
       cur.noi += r.data?.income_statement?.net_operating_income?.actual ?? 0;
+      cur.ni += r.data?.income_statement?.net_income?.actual ?? 0;
       byMonth.set(r.month, cur);
     }
   }
@@ -147,12 +151,19 @@ function fmtExec(n: number): string {
  * have a current Kube occupancy record, so a location that hasn't reported
  * yet doesn't silently zero out the portfolio figure (same guard pattern as
  * computePortfolioSnapshot for financials). */
-function computePortfolioOccupancy(locationData: Record<Location, LocationData>) {
+function computePortfolioOccupancy(locationData: Record<Location, LocationData>, month: string | null) {
   let sum = 0, count = 0, priorSum = 0, priorCount = 0;
   for (const loc of LOCATIONS) {
-    const pct = locationData[loc].occupancy?.occupancy_pct;
+    const occ = month
+      ? locationData[loc].allOccupancy.find(o => o.month === month)?.data
+      : locationData[loc].occupancy;
+    const pct = occ?.occupancy_pct;
     if (pct != null) { sum += pct; count++; }
-    const priorPct = locationData[loc].priorOccupancy?.occupancy_pct;
+    const priorMonthStr = month ? getPriorMonthLabel(month) : null;
+    const priorOcc = month
+      ? locationData[loc].allOccupancy.find(o => o.month === priorMonthStr)?.data
+      : locationData[loc].priorOccupancy;
+    const priorPct = priorOcc?.occupancy_pct;
     if (priorPct != null) { priorSum += priorPct; priorCount++; }
   }
   return {
@@ -160,6 +171,28 @@ function computePortfolioOccupancy(locationData: Record<Location, LocationData>)
     count,
     priorAvg: priorCount > 0 ? priorSum / priorCount : null,
   };
+}
+
+/** Portfolio occupancy history — average occupancy_pct per month across
+ * whichever locations reported that month, 2026 only for now (Christine's
+ * 2026-08-19 "historical occupancies" ask — she said stick to 2026, add
+ * 2025 later if that data becomes available). Feeds the Consolidated
+ * Overview's occupancy trend chart, the same reusable component the
+ * per-location Occupancy tab already uses. */
+function computePortfolioOccupancyTrend(locationData: Record<Location, LocationData>): { month: string; occupancy_pct: number | null }[] {
+  const byMonth = new Map<string, { sum: number; count: number }>();
+  for (const loc of LOCATIONS) {
+    for (const { month, data } of locationData[loc].allOccupancy) {
+      if (!month.endsWith("2026") || data?.occupancy_pct == null) continue;
+      const cur = byMonth.get(month) ?? { sum: 0, count: 0 };
+      cur.sum += data.occupancy_pct;
+      cur.count += 1;
+      byMonth.set(month, cur);
+    }
+  }
+  return [...byMonth.entries()]
+    .sort((a, b) => monthSortKeyLocal(a[0]) - monthSortKeyLocal(b[0]))
+    .map(([month, { sum, count }]) => ({ month, occupancy_pct: count > 0 ? sum / count : null }));
 }
 
 /** Boxed headline stat — the Net Income / Occupancy hero pair at the top of
@@ -191,7 +224,7 @@ function NoLocationData({ location, detail }: { location: string; detail: string
   );
 }
 
-export function DashboardClient({ locationData, packetData, userEmail, role }: Props) {
+export function DashboardClient({ locationData, packetData, userEmail, role, glItemReviews }: Props) {
   // Consolidated is the default landing tab — portfolio health first, drill
   // into a location second, matching how a reader actually approaches "how's
   // the business doing" rather than starting on one arbitrary location.
@@ -220,6 +253,25 @@ export function DashboardClient({ locationData, packetData, userEmail, role }: P
   const consolidatedMonths = Array.from(
     new Set(LOCATIONS.flatMap(loc => locationData[loc].availableMonths))
   );
+
+  // The Consolidated header/hero month label used to be derived through
+  // `currentMonth`, which comes from `activeLocation`'s per-location
+  // `selectedMonth` state (activeLocation resolves to LOCATIONS[0]/Frisco on
+  // the Consolidated tab). That meant switching to Consolidated after
+  // picking, say, "Jan 2026" from Frisco's own period pills carried that
+  // stale selection over, mislabeling the portfolio header "Portfolio · Jan
+  // 2026" even though every actual number shown (computePortfolioSnapshot,
+  // computePortfolioOccupancy) was already correctly computed from each
+  // location's true latest record — only the label was wrong. Caught via
+  // Christine's screenshot, 2026-08-19. This is computed independently of
+  // `activeLocation`/`selectedMonth` so it can never inherit a per-location
+  // pick again.
+  const consolidatedLatestMonth = LOCATIONS.reduce((latest: string | null, loc) => {
+    const m = locationData[loc].current?.month;
+    if (!m) return latest;
+    return !latest || monthSortKeyLocal(m) > monthSortKeyLocal(latest) ? m : latest;
+  }, null);
+  const consolidatedDisplayMonth = consolidatedMonth ?? consolidatedLatestMonth ?? "—";
 
   let current: MonthlyRecord | null;
   let prior: MonthlyRecord | null;
@@ -390,13 +442,13 @@ export function DashboardClient({ locationData, packetData, userEmail, role }: P
 
         {/* Consolidated view — all 5 locations, one shared period selector */}
         {isConsolidated ? (() => {
-          const portfolio = computePortfolioSnapshot(locationData);
+          const portfolio = computePortfolioSnapshot(locationData, consolidatedMonth);
           const portfolioTrend = computePortfolioTrend(locationData);
           const onPace = LOCATIONS.filter(l => healthStatuses[l] === "green").length;
           const atRisk = LOCATIONS.filter(l => healthStatuses[l] === "yellow").map(l => l);
           const offTrack = LOCATIONS.filter(l => healthStatuses[l] === "red").map(l => l);
           const scored = LOCATIONS.filter(l => healthStatuses[l] !== undefined).length;
-          const portfolioOcc = computePortfolioOccupancy(locationData);
+          const portfolioOcc = computePortfolioOccupancy(locationData, consolidatedMonth);
           const portfolioOccDelta = occupancyDeltaLabel(portfolioOcc.avg ?? undefined, portfolioOcc.priorAvg ?? undefined);
           const headline = scored === 0
             ? "Upload financial data to see portfolio performance."
@@ -408,17 +460,17 @@ export function DashboardClient({ locationData, packetData, userEmail, role }: P
 
           return (
             <div className="space-y-5">
-              <InsightPanel insight={headline} detail={`Portfolio · ${currentMonth}`} />
+              <InsightPanel insight={headline} detail={`Portfolio · ${consolidatedDisplayMonth}`} />
 
               {/* Hero pair: Net Income + Occupancy, boxed and filling the full row width */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <HeroCard
-                  label={`Net Income · ${currentMonth}`}
+                  label={`Net Income · ${consolidatedDisplayMonth}`}
                   value={fmtExec(portfolio.ni)}
                   valueNegative={portfolio.ni < 0}
                 />
                 <HeroCard
-                  label={`Occupancy · ${currentMonth}`}
+                  label={`Occupancy · ${consolidatedDisplayMonth}`}
                   value={portfolioOcc.avg != null ? `${Math.round(portfolioOcc.avg)}%` : "—"}
                   sub={
                     portfolioOcc.avg == null
@@ -431,6 +483,15 @@ export function DashboardClient({ locationData, packetData, userEmail, role }: P
               {portfolioTrend.length > 0 && (
                 <TrendChart data={portfolioTrend} />
               )}
+
+              {(() => {
+                const portfolioOccTrend = computePortfolioOccupancyTrend(locationData);
+                return portfolioOccTrend.filter(p => p.occupancy_pct != null).length >= 2 ? (
+                  <div className="bg-white rounded-lg border border-gray-200">
+                    <OccupancyTrendChart history={portfolioOccTrend} title="Portfolio Occupancy — 2026" />
+                  </div>
+                ) : null;
+              })()}
 
               {/* Drill-down grid — the second click, not the first thing seen */}
               <div className="space-y-2">
@@ -534,6 +595,7 @@ export function DashboardClient({ locationData, packetData, userEmail, role }: P
               onReviewChange={(reviewed) =>
                 setReviewOverrides(prev => ({ ...prev, [`${activeLocation}|${current.month}`]: reviewed }))
               }
+              itemReviews={glItemReviews.filter(r => r.location === activeLocation && r.month === current.month)}
             />
           ) : (
             <NoLocationData location={activeLocation} detail="GL data for this location hasn't been uploaded yet." />

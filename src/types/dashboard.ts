@@ -83,6 +83,19 @@ export interface VarianceFlag {
   threshold_used: number;
   rule_triggered: string;
   equity_account?: boolean;
+  transactions?: { date: string; person_description: string; control: string; amount: number }[];
+}
+
+/** Per-item approve/keep-flagged status on GL Check's three flagged-item
+ * panels. Reversible: "no entry for this item_key" and "flagged/never
+ * reviewed" are the same state. See migrations/add_gl_item_reviews.sql. */
+export interface GlItemReview {
+  location: Location;
+  month: string;
+  item_type: "variance" | "control" | "je";
+  item_key: string;
+  approved_by: string | null;
+  approved_at: string;
 }
 
 export interface ControlViolation {
@@ -173,6 +186,11 @@ export interface TrendPoint {
   revenue: number;
   gp: number;
   noi: number;
+  /** Net Income — the headline trend metric per Christine's 2026-08-19
+   * feedback (prefers NI over NOI as "the bottom line"). `noi` stays
+   * computed alongside it since it's still used as a P&L subtotal
+   * elsewhere; only the Overview trend chart switched to plotting this. */
+  ni: number;
 }
 
 // Financial Packet types (Phase 3 — from build_packet.py output)

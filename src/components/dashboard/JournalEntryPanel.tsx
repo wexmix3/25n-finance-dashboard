@@ -3,16 +3,19 @@
 import React, { useState } from "react";
 import type { JournalEntryAccount } from "@/types/dashboard";
 import { formatCurrency } from "@/lib/formatCurrency";
+import { ItemApproveButton } from "./ItemApproveButton";
+import type { ItemReviewApi } from "./GLCheckTab";
 
 interface Props {
   accounts: JournalEntryAccount[];
+  reviewApi: ItemReviewApi;
 }
 
 function fmtK(v: number): string {
   return formatCurrency(v, { compact: true, zeroDash: false });
 }
 
-export function JournalEntryPanel({ accounts }: Props) {
+export function JournalEntryPanel({ accounts, reviewApi }: Props) {
   const [expanded, setExpanded] = useState<string | null>(null);
 
   if (accounts.length === 0) {
@@ -50,22 +53,27 @@ export function JournalEntryPanel({ accounts }: Props) {
               <th className="px-4 py-2 text-left font-medium text-gray-400 uppercase tracking-wide">Description</th>
               <th className="px-4 py-2 text-right font-medium text-gray-400 uppercase tracking-wide"># Entries</th>
               <th className="px-4 py-2 text-right font-medium text-gray-400 uppercase tracking-wide">Net Amount</th>
+              <th className="px-4 py-2 w-24" />
               <th className="px-4 py-2 w-8" />
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-50">
             {sorted.map((e) => {
               const isOpen = expanded === e.account;
+              const approved = reviewApi.isApproved("je", e.account);
               return (
                 <React.Fragment key={e.account}>
                   <tr
-                    className="hover:bg-gray-50 cursor-pointer"
+                    className={`hover:bg-gray-50 cursor-pointer ${approved ? "opacity-50" : ""}`}
                     onClick={() => setExpanded(isOpen ? null : e.account)}
                   >
                     <td className="px-4 py-1.5 text-gray-400 font-mono">{e.account}</td>
                     <td className="px-4 py-1.5 text-gray-700 max-w-[200px] truncate">{e.account_name}</td>
                     <td className="px-4 py-1.5 text-right text-amber-700 font-semibold">{e.transaction_count}</td>
                     <td className="px-4 py-1.5 text-right text-gray-700">{fmtK(e.total_amount)}</td>
+                    <td className="px-4 py-1.5 text-right">
+                      <ItemApproveButton itemType="je" itemKey={e.account} reviewApi={reviewApi} />
+                    </td>
                     <td className="px-4 py-1.5 text-right text-gray-400">
                       <svg className={`w-3 h-3 inline-block transition-transform duration-150 ${isOpen ? "rotate-180" : ""}`} fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
                         <path strokeLinecap="round" strokeLinejoin="round" d="m19.5 8.25-7.5 7.5-7.5-7.5" />
@@ -74,7 +82,7 @@ export function JournalEntryPanel({ accounts }: Props) {
                   </tr>
                   {isOpen && (
                     <tr key={`${e.account}-detail`}>
-                      <td colSpan={5} className="px-4 py-2 bg-gray-50">
+                      <td colSpan={6} className="px-4 py-2 bg-gray-50">
                         <table className="w-full text-[11px]">
                           <thead>
                             <tr className="text-gray-400">
