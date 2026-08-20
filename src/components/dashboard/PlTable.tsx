@@ -305,7 +305,7 @@ export function PlTable({ current, prior, pacingPct, bare }: Props) {
           <SubtotalRow
             label={`Net Income (${formatMarginPct(is.net_income.margin_pct, totalRev)})`}
             actual={is.net_income.actual}
-            budget={null}
+            budget={is.net_income.budget}
             prior={pi?.net_income.actual}
             borderStrength="double"
             showRevPct={showRevPct}
