@@ -108,15 +108,24 @@ export function IncomeKpiRow({ current, prior, runRateFactor, pacingPct }: Props
   // Below this budget magnitude, a % variance explodes into noise (e.g. a $777
   // miss on a $63 budget reads as +1200%) — show the absolute dollar miss
   // instead once the denominator gets too small to carry a meaningful ratio.
+  // A dollar floor alone isn't enough, though: a $4,115 NI budget clears the
+  // floor but a $26.8K miss against it still renders as -641.5% (caught in
+  // Round 3 UX audit, 2026-08-19) — genuinely uninformative even though the
+  // denominator "looks" big enough. So also cap the resulting percentage
+  // itself; anything beyond ±300% has stopped being a ratio and started
+  // being noise regardless of how it got there.
   const PCT_DENOMINATOR_FLOOR = 2000;
+  const PCT_SANITY_CAP = 300;
   const revBudgetVariance = rev - budgetRev;
-  const vsBudgetRevPct = Math.abs(budgetRev) >= PCT_DENOMINATOR_FLOOR
+  const rawRevPct = Math.abs(budgetRev) >= PCT_DENOMINATOR_FLOOR
     ? (revBudgetVariance / Math.abs(budgetRev)) * 100
     : null;
-  const vsBudgetNi = Math.abs(proratedNiBudget) >= PCT_DENOMINATOR_FLOOR
+  const vsBudgetRevPct = rawRevPct !== null && Math.abs(rawRevPct) <= PCT_SANITY_CAP ? rawRevPct : null;
+  const rawNiPct = Math.abs(proratedNiBudget) >= PCT_DENOMINATOR_FLOOR
     ? ((ni - proratedNiBudget) / Math.abs(proratedNiBudget)) * 100
     : null;
-  const niMissTooSmallForPct = Math.abs(proratedNiBudget) < PCT_DENOMINATOR_FLOOR && proratedNiBudget !== 0;
+  const vsBudgetNi = rawNiPct !== null && Math.abs(rawNiPct) <= PCT_SANITY_CAP ? rawNiPct : null;
+  const niMissTooSmallForPct = vsBudgetNi === null && proratedNiBudget !== 0;
 
   // Revenue run-rate only — OPEX is fixed-cost so NOI projection math is invalid
   const projRev = runRateFactor ? `→ ${fmt(rev * runRateFactor)} est. full-mo.` : undefined;

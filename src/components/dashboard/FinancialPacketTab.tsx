@@ -88,7 +88,12 @@ function AgingTable({ label, totals }: { label: string; totals: Record<string, n
     { key: "d61_90", label: "61–90 days" },
     { key: "over_90", label: "Over 90" },
   ];
-  const lateCount = buckets.filter(b => (totals[b.key] ?? 0) !== 0).length;
+  // Sub-$10 amounts in an aging bucket are rounding/reconciliation dust, not
+  // a real balance — showing e.g. "($4)" in a client-facing packet reads as
+  // sloppy bookkeeping rather than the immaterial noise it actually is.
+  const DUST_FLOOR = 10;
+  const clean = (v: number) => (Math.abs(v) < DUST_FLOOR ? 0 : v);
+  const lateCount = buckets.filter(b => clean(totals[b.key] ?? 0) !== 0).length;
 
   return (
     <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
@@ -113,12 +118,13 @@ function AgingTable({ label, totals }: { label: string; totals: Record<string, n
         </thead>
         <tbody className="divide-y divide-gray-100">
           {buckets.map(b => {
-            const isLate = b.key !== "current" && b.key !== "d0_30" && (totals[b.key] ?? 0) !== 0;
+            const amount = clean(totals[b.key] ?? 0);
+            const isLate = b.key !== "current" && b.key !== "d0_30" && amount !== 0;
             return (
               <tr key={b.key} className="hover:bg-gray-50 transition-colors">
                 <td className={`px-5 py-2.5 text-xs ${isLate ? "font-medium text-red-600" : "text-gray-700"}`}>{b.label}</td>
                 <td className={`px-5 py-2.5 text-right text-xs tabular-nums ${isLate ? "text-red-600 font-medium" : "text-gray-700"}`}>
-                  {fmt$(totals[b.key] ?? 0)}
+                  {fmt$(amount)}
                 </td>
               </tr>
             );
@@ -342,7 +348,20 @@ export function FinancialPacketTab({ currentData, packet }: Props) {
                   <td className="px-5 py-2.5 text-xs text-gray-600">
                     Net Cash Flow — YTD
                     {!packetData.cash_flow.ytd_complete && (
-                      <span className="ml-1.5 text-[10px] text-amber-700 font-medium">(partial — missing months)</span>
+                      // A caveat that reads as a dev disclaimer ("partial —
+                      // missing months") doesn't belong inline in a metric
+                      // label on the doc that gets PDF'd and sent to
+                      // Christine/the CEO. A quiet info glyph with the same
+                      // detail on hover keeps the number honest without
+                      // making the packet look unfinished.
+                      <span
+                        className="ml-1.5 inline-flex items-center align-middle text-gray-300 hover:text-gray-500 cursor-help"
+                        title="Year-to-date figure is a partial total — one or more months this year are still missing from the record."
+                      >
+                        <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M11.25 11.25l.041-.02a.75.75 0 011.063.852l-.708 2.836a.75.75 0 001.063.853l.041-.021M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-9-3.75h.008v.008H12V8.25z" />
+                        </svg>
+                      </span>
                     )}
                   </td>
                   <td className="px-5 py-2.5 text-right text-xs text-gray-800 tabular-nums">{fmt$(packetData.cash_flow.net_cash_flow_ytd)}</td>
@@ -375,6 +394,24 @@ export function FinancialPacketTab({ currentData, packet }: Props) {
           <PlaceholderSection title="AP Aging" reason="Not yet uploaded" />
         )}
       </div>
+
+      {/* Two equal-size cards next to each other otherwise hide a real scale
+          gap — AP running multiples of AR is a liquidity signal worth
+          surfacing, not something two identically-sized boxes should flatten. */}
+      {packetData?.ar_aging && !packetData.ar_aging.error && packetData?.ap_aging && !packetData.ap_aging.error && (() => {
+        const arTotal = (packetData.ar_aging.totals as unknown as Record<string, number>).total_owed ?? 0;
+        const apTotal = (packetData.ap_aging.totals as unknown as Record<string, number>).total_owed ?? 0;
+        if (arTotal <= 0 || apTotal <= 0) return null;
+        const ratio = apTotal / arTotal;
+        if (ratio < 2 && ratio > 0.5) return null;
+        const bigger = ratio >= 2 ? "AP" : "AR";
+        const multiple = ratio >= 2 ? ratio : 1 / ratio;
+        return (
+          <p className="text-xs text-gray-400 -mt-1">
+            {bigger} is {multiple.toFixed(1)}x {bigger === "AP" ? "AR" : "AP"} this period.
+          </p>
+        );
+      })()}
     </div>
   );
 }

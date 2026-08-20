@@ -15,6 +15,13 @@ interface SectionFlag {
   isRevenue: boolean;
 }
 
+// A tiny prior-period value can turn a modest dollar swing into a
+// meaningless percentage (e.g. Utilities $47 -> $2,256 reads as +4721.1%,
+// caught in Round 3 UX audit 2026-08-19) — cap what's shown as a %, the
+// dollar change (already displayed alongside it) carries the real signal
+// once the ratio stops being informative.
+const PCT_SANITY_CAP = 300;
+
 function shouldFlag(current: number, prior: number): boolean {
   const variance = Math.abs(current - prior);
   if (prior === 0) return Math.abs(current) > 500;
@@ -51,8 +58,13 @@ function buildSectionFlags(current: FinancialData, prior: FinancialData): Sectio
     .filter((s) => shouldFlag(s.curr, s.prev))
     .map((s) => {
       const variance = s.curr - s.prev;
-      const pct = s.prev !== 0 ? (variance / Math.abs(s.prev)) * 100 : null;
-      return { label: s.label, current: s.curr, prior: s.prev, variance, pct: pct !== null ? Math.round(pct * 10) / 10 : null, isRevenue: s.isRevenue };
+      const rawPct = s.prev !== 0 ? (variance / Math.abs(s.prev)) * 100 : null;
+      // NaN is a deliberate sentinel here, distinct from null ("new" — no
+      // prior to compare against): it means a prior existed but was too
+      // small to keep the ratio meaningful, so fmtPct renders it "n/a"
+      // instead of the misleading "new".
+      const pct = rawPct === null ? null : Math.abs(rawPct) <= PCT_SANITY_CAP ? Math.round(rawPct * 10) / 10 : NaN;
+      return { label: s.label, current: s.curr, prior: s.prev, variance, pct, isRevenue: s.isRevenue };
     })
     .sort((a, b) => Math.abs(b.variance) - Math.abs(a.variance));
 }
@@ -65,6 +77,7 @@ function fmtK(v: number): string {
 
 function fmtPct(v: number | null): string {
   if (v === null) return "new";
+  if (Number.isNaN(v)) return "n/a";
   return `${v > 0 ? "+" : ""}${v.toFixed(1)}%`;
 }
 

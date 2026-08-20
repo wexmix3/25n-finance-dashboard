@@ -604,7 +604,7 @@ export function DashboardClient({ locationData, packetData, userEmail, role }: P
                 <InsightPanel
                   insight={heroInsight ?? `Net Income for ${currentMonth}`}
                   detail={heroDetail}
-                  actionLabel="View GL Check →"
+                  actionLabel="View GL Check"
                   onAction={() => setActiveView("gl")}
                 />
 

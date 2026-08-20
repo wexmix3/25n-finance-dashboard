@@ -1,5 +1,10 @@
+"use client";
+
+import { useState } from "react";
 import type { ControlViolation } from "@/types/dashboard";
 import { formatCurrency } from "@/lib/formatCurrency";
+
+const PAGE_SIZE = 25;
 
 interface Props {
   violations: ControlViolation[];
@@ -9,13 +14,21 @@ function fmtK(v: number): string {
   return formatCurrency(v, { compact: true, zeroDash: false });
 }
 
-const ISSUE_LABEL: Record<string, string> = {
+// Fallback only — every real violation already carries its own specific
+// `message` (e.g. "expected one of: ['P','K','J','R']"), computed by
+// parse_general_ledger.py. Round 3 UX audit (2026-08-19) caught the table
+// rendering this generic label for every row instead, discarding the
+// specific reason that was already sitting in the data.
+const ISSUE_LABEL_FALLBACK: Record<string, string> = {
   wrong_control_prefix: "Unexpected control # prefix for this account",
   wrong_vendor: "Vendor on transaction doesn't match vendor of record",
   inactive_account_has_activity: "Inactive account has activity",
 };
 
 export function ControlViolationsPanel({ violations }: Props) {
+  // Hooks must run unconditionally — the empty-state early return comes after.
+  const [showAll, setShowAll] = useState(false);
+
   if (violations.length === 0) {
     return (
       <div className="bg-white rounded-lg border border-gray-200 p-4">
@@ -25,7 +38,12 @@ export function ControlViolationsPanel({ violations }: Props) {
     );
   }
 
-  const sorted = [...violations].sort((a, b) => a.account.localeCompare(b.account));
+  // Biggest-dollar issues first — with 214 transaction-level rows possible
+  // (Schaumburg, Jul 2026), account-code order buried the issues worth
+  // looking at first under alphabetical noise.
+  const sorted = [...violations].sort((a, b) => Math.abs(b.amount) - Math.abs(a.amount));
+  const visible = showAll ? sorted : sorted.slice(0, PAGE_SIZE);
+  const hiddenCount = sorted.length - visible.length;
 
   return (
     <div className="bg-white rounded-lg border border-gray-200">
@@ -55,18 +73,26 @@ export function ControlViolationsPanel({ violations }: Props) {
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-50">
-            {sorted.map((v, i) => (
+            {visible.map((v, i) => (
               <tr key={`${v.account}-${v.control}-${i}`} className="hover:bg-gray-50">
                 <td className="px-4 py-1.5 text-gray-400 font-mono">{v.account}</td>
                 <td className="px-4 py-1.5 text-gray-700 max-w-[160px] truncate">{v.account_name}</td>
                 <td className="px-4 py-1.5 text-gray-500 font-mono">{v.control}</td>
                 <td className="px-4 py-1.5 text-right text-gray-700">{fmtK(v.amount)}</td>
-                <td className="px-4 py-1.5 text-red-600">{ISSUE_LABEL[v.violation_type] ?? v.violation_type}</td>
+                <td className="px-4 py-1.5 text-red-600">{v.message || ISSUE_LABEL_FALLBACK[v.violation_type] || v.violation_type}</td>
               </tr>
             ))}
           </tbody>
         </table>
       </div>
+      {hiddenCount > 0 && (
+        <button
+          onClick={() => setShowAll(true)}
+          className="w-full px-4 py-2.5 text-xs font-semibold text-gray-500 hover:text-gray-700 hover:bg-gray-50 border-t border-gray-100 transition-colors duration-150 cursor-pointer"
+        >
+          Show {hiddenCount} more (sorted by $ amount)
+        </button>
+      )}
     </div>
   );
 }

@@ -77,6 +77,7 @@ function OccupancyTrendChart({ history }: { history: { month: string; occupancy_
             stroke="#F15B27"
             strokeWidth={2}
             fill="url(#fillOccupancy)"
+            connectNulls
             dot={(props: { cx?: number; cy?: number; index?: number }) => {
               const { cx, cy, index } = props;
               if (cx == null || cy == null || index == null) return <g />;
@@ -131,6 +132,16 @@ export function OccupancySection({ current, prior, expectedMonth, history }: Pro
     current.booked_desks != null && current.available_desks != null && current.available_desks > 0
       ? Math.round((current.booked_desks / current.available_desks) * 100)
       : null;
+  const priorUtilization =
+    prior?.booked_desks != null && prior?.available_desks != null && prior.available_desks > 0
+      ? Math.round((prior.booked_desks / prior.available_desks) * 100)
+      : null;
+  // Utilization previously showed no MoM comparison at all while every
+  // sibling stat had one, so its absolute-level red/amber/green coloring
+  // read as arbitrary next to Occupancy's neutral black at the same value
+  // (Round 3 UX audit, 2026-08-19). Giving it the same delta line the others
+  // get makes the color legible as "low and worth watching," not random.
+  const utilizationDelta = deltaInt(utilization ?? undefined, priorUtilization ?? undefined);
 
   return (
     <div className="bg-white rounded-lg border border-gray-200">
@@ -195,7 +206,13 @@ export function OccupancySection({ current, prior, expectedMonth, history }: Pro
             <p className={`text-2xl font-semibold ${utilization >= 80 ? "text-emerald-600" : utilization >= 60 ? "text-amber-700" : "text-red-600"}`}>
               {utilization}%
             </p>
-            <p className="text-xs text-gray-400 mt-0.5">booked / available</p>
+            {utilizationDelta ? (
+              <p className={`text-xs mt-0.5 ${utilizationDelta.startsWith("+") ? "text-emerald-600" : "text-red-600"}`}>
+                {utilizationDelta} MoM
+              </p>
+            ) : (
+              <p className="text-xs text-gray-400 mt-0.5">booked / available</p>
+            )}
           </div>
         )}
       </div>
