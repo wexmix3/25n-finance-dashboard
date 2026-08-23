@@ -10,6 +10,10 @@ interface Props {
   currentData: FinancialData;
   priorMonth: string;
   uploadedAt?: string;
+  /** Locked periods are closed for the month-end close process -- per Max's
+   * rule (2026-08-23), a locked period's flags no longer represent action
+   * items, so this tab shows a "closed" banner instead of a review prompt. */
+  locked?: boolean;
   reviewed?: boolean;
   reviewedBy?: string | null;
   reviewedAt?: string | null;
@@ -44,7 +48,7 @@ function fmtDate(iso?: string | null): string {
   return new Date(iso).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
 }
 
-export function GLCheckTab({ currentData, priorMonth, uploadedAt, reviewed, reviewedBy, reviewedAt, onReviewChange, itemReviews, itemNotes }: Props) {
+export function GLCheckTab({ currentData, priorMonth, uploadedAt, locked, reviewed, reviewedBy, reviewedAt, onReviewChange, itemReviews, itemNotes }: Props) {
   const [pending, setPending] = useState(false);
   const [localReviewed, setLocalReviewed] = useState(reviewed ?? false);
   const [localReviewedBy, setLocalReviewedBy] = useState(reviewedBy ?? null);
@@ -127,14 +131,16 @@ export function GLCheckTab({ currentData, priorMonth, uploadedAt, reviewed, revi
   const jeCount = unapprovedCount("je", jeKeys);
   const totalIssues = flagCount + violationCount + jeCount;
 
-  const statusColor =
-    localReviewed ? "text-emerald-600 bg-emerald-50 border-emerald-200"
+  const statusColor = locked
+    ? "text-gray-500 bg-gray-50 border-gray-200"
+    : localReviewed ? "text-emerald-600 bg-emerald-50 border-emerald-200"
     : totalIssues === 0 ? "text-emerald-600 bg-emerald-50 border-emerald-200"
     : totalIssues <= 5 ? "text-amber-700 bg-amber-50 border-amber-200"
     : "text-red-600 bg-red-50 border-red-200";
 
-  const statusLabel =
-    localReviewed ? "Reviewed"
+  const statusLabel = locked
+    ? "Closed — Locked"
+    : localReviewed ? "Reviewed"
     : totalIssues === 0 ? "Clean"
     : `${totalIssues} item${totalIssues !== 1 ? "s" : ""} to review`;
 
@@ -175,23 +181,43 @@ export function GLCheckTab({ currentData, priorMonth, uploadedAt, reviewed, revi
           <span className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold border ${statusColor}`}>
             {statusLabel}
           </span>
-          <button
-            onClick={toggleReviewed}
-            disabled={pending}
-            className={[
-              "text-xs font-medium px-3 py-1 rounded border transition-colors duration-150 cursor-pointer whitespace-nowrap disabled:opacity-50 disabled:cursor-wait",
-              localReviewed
-                ? "border-gray-200 text-gray-500 hover:text-gray-700 hover:border-gray-300"
-                : "border-[#F15B27]/40 bg-[#fdf2e9] text-[#F15B27] hover:bg-[#fbe3ce]",
-            ].join(" ")}
-          >
-            {localReviewed ? "Mark unreviewed" : "Mark reviewed"}
-          </button>
+          {/* Locked periods are closed -- there's nothing left to mark reviewed,
+              so the action button doesn't apply and would only invite a
+              pointless click. */}
+          {!locked && (
+            <button
+              onClick={toggleReviewed}
+              disabled={pending}
+              className={[
+                "text-xs font-medium px-3 py-1 rounded border transition-colors duration-150 cursor-pointer whitespace-nowrap disabled:opacity-50 disabled:cursor-wait",
+                localReviewed
+                  ? "border-gray-200 text-gray-500 hover:text-gray-700 hover:border-gray-300"
+                  : "border-[#F15B27]/40 bg-[#fdf2e9] text-[#F15B27] hover:bg-[#fbe3ce]",
+              ].join(" ")}
+            >
+              {localReviewed ? "Mark unreviewed" : "Mark reviewed"}
+            </button>
+          )}
         </div>
       </div>
 
+      {/* Locked banner -- takes priority over the reviewed banner below;
+          period is closed, flags are historical record only, not action
+          items. Doesn't hide the underlying data, same philosophy as the
+          reviewed banner. */}
+      {locked && (
+        <div className="rounded-lg border border-gray-200 bg-gray-50 px-4 py-2.5 flex items-center gap-2.5">
+          <svg className="w-4 h-4 text-gray-500 flex-shrink-0" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" d="M16.5 10.5V6.75a4.5 4.5 0 1 0-9 0v3.75m-.75 11.25h10.5a2.25 2.25 0 0 0 2.25-2.25v-6.75a2.25 2.25 0 0 0-2.25-2.25H6.75a2.25 2.25 0 0 0-2.25 2.25v6.75a2.25 2.25 0 0 0 2.25 2.25Z" />
+          </svg>
+          <span className="text-xs text-gray-500">
+            This period is locked and closed — any flags below are historical record only, not action items.
+          </span>
+        </div>
+      )}
+
       {/* Reviewed banner — doesn't hide the underlying data, just acknowledges it was looked at */}
-      {localReviewed && (
+      {!locked && localReviewed && (
         <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-2.5 flex items-center gap-2.5">
           <svg className="w-4 h-4 text-emerald-600 flex-shrink-0" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" d="m4.5 12.75 6 6 9-13.5" />
@@ -208,19 +234,19 @@ export function GLCheckTab({ currentData, priorMonth, uploadedAt, reviewed, revi
           headline number tracks real remaining work. */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
         <div className="bg-gray-50 rounded-lg p-4 text-center">
-          <p className={`text-2xl font-bold ${flagCount === 0 ? "text-emerald-600" : "text-amber-700"}`}>
+          <p className={`text-2xl font-bold ${locked ? "text-gray-400" : flagCount === 0 ? "text-emerald-600" : "text-amber-700"}`}>
             {flagCount}
           </p>
           <p className="text-xs text-gray-400 mt-0.5">Variance Flags</p>
         </div>
         <div className="bg-gray-50 rounded-lg p-4 text-center">
-          <p className={`text-2xl font-bold ${violationCount === 0 ? "text-emerald-600" : "text-red-600"}`}>
+          <p className={`text-2xl font-bold ${locked ? "text-gray-400" : violationCount === 0 ? "text-emerald-600" : "text-red-600"}`}>
             {violationCount}
           </p>
           <p className="text-xs text-gray-400 mt-0.5">Control # Issues</p>
         </div>
         <div className="bg-gray-50 rounded-lg p-4 text-center">
-          <p className={`text-2xl font-bold ${jeCount === 0 ? "text-emerald-600" : "text-amber-700"}`}>
+          <p className={`text-2xl font-bold ${locked ? "text-gray-400" : jeCount === 0 ? "text-emerald-600" : "text-amber-700"}`}>
             {jeCount}
           </p>
           <p className="text-xs text-gray-400 mt-0.5">Needs JE Review</p>

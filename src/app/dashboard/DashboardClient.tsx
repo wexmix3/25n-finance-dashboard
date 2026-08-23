@@ -328,7 +328,11 @@ export function DashboardClient({ locationData, packetData, userEmail, role, glI
     const reviewKey = rec ? `${loc}|${rec.month}` : "";
     const isReviewed = reviewOverrides[reviewKey] ?? rec?.gl_reviewed ?? false;
     const totalIssues = (d?.variance_flags?.length ?? 0) + (d?.control_violations?.length ?? 0) + (d?.journal_entry_accounts?.length ?? 0);
-    if (totalIssues > 0 && !isReviewed) {
+    // Locked periods are closed -- Max's rule (2026-08-23): once a period is
+    // locked, its GL issues no longer require action, so they shouldn't
+    // drive the "needs review" badge. Only Jul/Aug (the two still-open
+    // periods) should ever surface here in normal operation.
+    if (totalIssues > 0 && !isReviewed && !rec?.locked) {
       flagCounts[loc] = totalIssues;
     }
     const ni = d?.income_statement?.net_income;
@@ -401,7 +405,8 @@ export function DashboardClient({ locationData, packetData, userEmail, role, glI
     const d = locationData[loc].current?.data;
     const reviewKey = locationData[loc].current ? `${loc}|${locationData[loc].current!.month}` : "";
     const reviewed = reviewOverrides[reviewKey] ?? locationData[loc].current?.gl_reviewed ?? false;
-    if (reviewed) return sum;
+    // Locked periods don't need review -- see flagCounts above for the same rule.
+    if (reviewed || locationData[loc].current?.locked) return sum;
     return sum + (d?.variance_flags?.length ?? 0) + (d?.control_violations?.length ?? 0) + (d?.journal_entry_accounts?.length ?? 0);
   }, 0);
 
@@ -564,8 +569,8 @@ export function DashboardClient({ locationData, packetData, userEmail, role, glI
                   const reviewKey = current ? `${activeLocation}|${current.month}` : "";
                   const isReviewed = reviewOverrides[reviewKey] ?? current?.gl_reviewed ?? false;
                   // Same 3-tier severity as GLCheckTab's own status pill and
-                  // the sidebar badge.
-                  return glIssues > 0 && !isReviewed && (
+                  // the sidebar badge. Locked periods don't need review.
+                  return glIssues > 0 && !isReviewed && !current?.locked && (
                     <span className={`ml-1.5 inline-flex items-center justify-center w-4 h-4 rounded-full text-[10px] font-bold ${
                       glIssues <= 5 ? "bg-amber-50 text-amber-700" : "bg-red-50 text-red-600"
                     }`}>
@@ -602,6 +607,7 @@ export function DashboardClient({ locationData, packetData, userEmail, role, glI
               currentData={currentData}
               priorMonth={priorMonth}
               uploadedAt={current?.uploaded_at}
+              locked={current?.locked}
               reviewed={reviewOverrides[`${activeLocation}|${current.month}`] ?? current.gl_reviewed}
               reviewedBy={current.gl_reviewed_by}
               reviewedAt={current.gl_reviewed_at}
