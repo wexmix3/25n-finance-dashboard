@@ -48,18 +48,37 @@ function computePacing(month: string, uploadedAt: string): { daysElapsed: number
  * slot missing the location/month needed to call the API) fall back to the
  * original read-only "Final" badge — shown only when locked, silent
  * otherwise, so nothing changes for viewer-role users. */
+function LockIcon({ open }: { open: boolean }) {
+  return open ? (
+    <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <rect x="4" y="11" width="16" height="10" rx="2" />
+      <path d="M8 11V7a4 4 0 0 1 7.6-1.8" />
+    </svg>
+  ) : (
+    <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <rect x="4" y="11" width="16" height="10" rx="2" />
+      <path d="M8 11V7a4 4 0 0 1 8 0v4" />
+    </svg>
+  );
+}
+
 function LockControl({
   location,
   month,
   locked,
   isAdmin,
   onLockChange,
+  /** "primary" is the bold current-period pill; "muted" is a quieter, icon-led
+   * treatment for the prior-period utility slot so it doesn't read as a
+   * second, competing period tab. */
+  variant = "primary",
 }: {
   location?: Location;
   month: string;
   locked?: boolean;
   isAdmin: boolean;
   onLockChange?: (month: string, locked: boolean) => void;
+  variant?: "primary" | "muted";
 }) {
   const router = useRouter();
   const [pending, setPending] = useState(false);
@@ -77,7 +96,14 @@ function LockControl({
 
   if (!isAdmin || !location || month === "—") {
     return locked ? (
-      <span className="inline-flex items-center px-1.5 py-0.5 rounded text-xs font-semibold bg-emerald-50 text-emerald-600">
+      <span
+        className={
+          variant === "muted"
+            ? "inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[11px] font-medium text-gray-400"
+            : "inline-flex items-center px-1.5 py-0.5 rounded text-xs font-semibold bg-emerald-50 text-emerald-600"
+        }
+      >
+        {variant === "muted" && <LockIcon open={false} />}
         Final
       </span>
     ) : null;
@@ -103,6 +129,25 @@ function LockControl({
     } finally {
       setPending(false);
     }
+  }
+
+  if (variant === "muted") {
+    return (
+      <button
+        onClick={toggleLock}
+        disabled={pending}
+        title={localLocked ? `${month} is locked — click to unlock` : `${month} is unlocked — click to lock`}
+        className={[
+          "inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[11px] font-medium transition-colors duration-150 cursor-pointer whitespace-nowrap disabled:opacity-50 disabled:cursor-wait",
+          localLocked
+            ? "text-gray-400 hover:text-gray-600 hover:bg-gray-50"
+            : "text-[#F15B27]/70 hover:text-[#F15B27] hover:bg-[#fdf2e9]",
+        ].join(" ")}
+      >
+        <LockIcon open={!localLocked} />
+        {localLocked ? "Unlock" : "Lock"}
+      </button>
+    );
   }
 
   return (
@@ -162,12 +207,15 @@ export function PeriodBanner({ currentMonth, priorMonth, uploadedAt, locked, cur
 
         <div className="h-4 w-px bg-gray-200" />
 
-        {/* Prior period — read-only "Final" status for non-admins; admins get
-            the same lock/unlock toggle as the current-period slot (restored
-            2026-08-23 after 2026-08-19 removal — Max wants it back, scoped to
-            whichever month is actually selected rather than hardcoded to
-            "prior period"). */}
-        <div className="flex items-center gap-2">
+        {/* Prior period — a correction-access utility (unlock a already-Final
+            month for a late GL fix), not a second navigable period tab. Kept
+            visually muted/labeled so it doesn't compete with the bold current-
+            period slot on the left. Read-only "Final" status for non-admins;
+            admins get the lock/unlock toggle (restored 2026-08-23 after
+            2026-08-19 removal — Max wants it back, scoped to whichever month
+            is actually selected rather than hardcoded to "prior period"). */}
+        <div className="flex items-center gap-1.5">
+          <span className="text-[10px] font-semibold uppercase tracking-wide text-gray-300">Prior</span>
           <span className="text-sm font-medium text-gray-400">{priorMonth}</span>
           <LockControl
             location={location}
@@ -175,6 +223,7 @@ export function PeriodBanner({ currentMonth, priorMonth, uploadedAt, locked, cur
             locked={locked}
             isAdmin={isAdmin}
             onLockChange={onLockChange}
+            variant="muted"
           />
         </div>
       </div>
