@@ -580,6 +580,9 @@ export function DashboardClient({ locationData, packetData, userEmail, role, glI
             priorMonth={priorMonth}
             uploadedAt={current?.uploaded_at}
             locked={prior?.locked}
+            currentLocked={current?.locked}
+            role={role}
+            location={activeLocation}
           />
         )}
 

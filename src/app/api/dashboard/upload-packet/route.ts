@@ -29,6 +29,22 @@ export async function POST(request: NextRequest) {
   }
 
   const supabase = createServiceClient();
+
+  // Lock status lives on monthly_financials, not monthly_packets — cross-
+  // reference it before upserting so a locked period's Financial Packet data
+  // can't be silently overwritten by the GL email watcher's
+  // build_packet.py --push step (same soft-reject behavior as upload-gl).
+  const { data: existing } = await supabase
+    .from("monthly_financials")
+    .select("locked")
+    .eq("location", location)
+    .eq("month", month)
+    .single();
+
+  if (existing?.locked) {
+    return NextResponse.json({ status: "locked — not updated", location, month });
+  }
+
   const { error } = await supabase
     .from("monthly_packets")
     .upsert(

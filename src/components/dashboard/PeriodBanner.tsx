@@ -1,10 +1,28 @@
 "use client";
 
+import { useState } from "react";
+import { useRouter } from "next/navigation";
+import type { Location } from "@/types/dashboard";
+
 interface Props {
   currentMonth: string;
   priorMonth: string;
   uploadedAt?: string;
+  /** Lock status for the prior-period slot (kept as its own prop for
+   * backwards compat with existing callers/behavior). */
   locked?: boolean;
+  /** Lock status for the current-period slot — current period previously had
+   * no lock display at all. */
+  currentLocked?: boolean;
+  /** Caller's role — the toggle only renders for "admin"; everyone else sees
+   * the same read-only "Final" badge that existed before. */
+  role?: string;
+  /** Location the active month belongs to, needed for the lock-period API call. */
+  location?: Location;
+  /** Fired after a successful lock/unlock so the caller can update any local
+   * state that mirrors lock status (in addition to the router.refresh() this
+   * component triggers itself). */
+  onLockChange?: (month: string, locked: boolean) => void;
 }
 
 function computePacing(month: string, uploadedAt: string): { daysElapsed: number; daysInMonth: number } | null {
@@ -26,10 +44,89 @@ function computePacing(month: string, uploadedAt: string): { daysElapsed: number
   return { daysElapsed: daysInMonth, daysInMonth };
 }
 
-export function PeriodBanner({ currentMonth, priorMonth, uploadedAt, locked }: Props) {
+/** Admin-only lock/unlock control for one period slot. Non-admins (and any
+ * slot missing the location/month needed to call the API) fall back to the
+ * original read-only "Final" badge — shown only when locked, silent
+ * otherwise, so nothing changes for viewer-role users. */
+function LockControl({
+  location,
+  month,
+  locked,
+  isAdmin,
+  onLockChange,
+}: {
+  location?: Location;
+  month: string;
+  locked?: boolean;
+  isAdmin: boolean;
+  onLockChange?: (month: string, locked: boolean) => void;
+}) {
+  const router = useRouter();
+  const [pending, setPending] = useState(false);
+  const [localLocked, setLocalLocked] = useState(!!locked);
+  const [syncedLocked, setSyncedLocked] = useState(locked);
+
+  // Keep in sync if the server-derived prop changes (e.g. switching months
+  // via the pill row) — this is the render-time "getDerivedStateFromProps"
+  // pattern (state var + comparison, no effect) rather than useEffect, so a
+  // month switch is reflected on the same render instead of one tick later.
+  if (locked !== syncedLocked) {
+    setSyncedLocked(locked);
+    setLocalLocked(!!locked);
+  }
+
+  if (!isAdmin || !location || month === "—") {
+    return locked ? (
+      <span className="inline-flex items-center px-1.5 py-0.5 rounded text-xs font-semibold bg-emerald-50 text-emerald-600">
+        Final
+      </span>
+    ) : null;
+  }
+
+  async function toggleLock() {
+    const next = !localLocked;
+    setPending(true);
+    try {
+      const resp = await fetch(`/api/dashboard/${next ? "lock-period" : "unlock-period"}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ location, month }),
+      });
+      if (!resp.ok) {
+        const body = await resp.json().catch(() => ({}));
+        alert(`Couldn't ${next ? "lock" : "unlock"} ${month}: ${body.error ?? resp.statusText}`);
+        return;
+      }
+      setLocalLocked(next);
+      onLockChange?.(month, next);
+      router.refresh();
+    } finally {
+      setPending(false);
+    }
+  }
+
+  return (
+    <button
+      onClick={toggleLock}
+      disabled={pending}
+      title={localLocked ? `${month} is locked — click to unlock` : `${month} is unlocked — click to lock`}
+      className={[
+        "inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-xs font-semibold border transition-colors duration-150 cursor-pointer whitespace-nowrap disabled:opacity-50 disabled:cursor-wait",
+        localLocked
+          ? "bg-emerald-50 text-emerald-600 border-emerald-200 hover:bg-emerald-100"
+          : "bg-[#fdf2e9] text-[#F15B27] border-[#F15B27]/40 hover:bg-[#fbe3ce]",
+      ].join(" ")}
+    >
+      {localLocked ? "Final · Unlock" : "Lock period"}
+    </button>
+  );
+}
+
+export function PeriodBanner({ currentMonth, priorMonth, uploadedAt, locked, currentLocked, role, location, onLockChange }: Props) {
   const pacing = uploadedAt && currentMonth !== "—" ? computePacing(currentMonth, uploadedAt) : null;
   const pacingPct = pacing ? Math.round((pacing.daysElapsed / pacing.daysInMonth) * 100) : null;
   const isFull = pacing ? pacing.daysElapsed === pacing.daysInMonth : false;
+  const isAdmin = role === "admin";
 
   const uploadLabel = uploadedAt
     ? `updated ${new Date(uploadedAt).toLocaleDateString("en-US", { month: "short", day: "numeric", timeZone: "UTC" })}`
@@ -54,20 +151,31 @@ export function PeriodBanner({ currentMonth, priorMonth, uploadedAt, locked }: P
             </span>
           )}
           <span className="text-xs text-gray-400">{uploadLabel}</span>
+          <LockControl
+            location={location}
+            month={currentMonth}
+            locked={currentLocked}
+            isAdmin={isAdmin}
+            onLockChange={onLockChange}
+          />
         </div>
 
         <div className="h-4 w-px bg-gray-200" />
 
-        {/* Prior period — read-only "Final" status, no lock/unlock controls
-            (removed 2026-08-19: discretionary admin action, not daily-use
-            navigation; data-integrity enforcement stays server-side). */}
+        {/* Prior period — read-only "Final" status for non-admins; admins get
+            the same lock/unlock toggle as the current-period slot (restored
+            2026-08-23 after 2026-08-19 removal — Max wants it back, scoped to
+            whichever month is actually selected rather than hardcoded to
+            "prior period"). */}
         <div className="flex items-center gap-2">
           <span className="text-sm font-medium text-gray-400">{priorMonth}</span>
-          {locked && (
-            <span className="inline-flex items-center px-1.5 py-0.5 rounded text-xs font-semibold bg-emerald-50 text-emerald-600">
-              Final
-            </span>
-          )}
+          <LockControl
+            location={location}
+            month={priorMonth}
+            locked={locked}
+            isAdmin={isAdmin}
+            onLockChange={onLockChange}
+          />
         </div>
       </div>
 
