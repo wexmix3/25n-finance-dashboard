@@ -1,6 +1,6 @@
 import { Location, LOCATIONS } from "@/types/dashboard";
 
-type HealthStatus = "green" | "yellow" | "red";
+type HealthStatus = "green" | "yellow" | "red" | "gray";
 
 interface Props {
   healthStatuses: Partial<Record<Location, HealthStatus>>;
@@ -13,7 +13,10 @@ function buildSummary(
   currentMonth: string,
   pacingPct: number | null
 ): { text: string; tone: "good" | "warn" | "bad" | "neutral" } {
-  const scored = LOCATIONS.filter(l => healthStatuses[l] !== undefined);
+  // "gray" (no budget set yet, e.g. pre-opening Uptown) isn't a scored
+  // pace/budget outcome — exclude it here the same way undefined always
+  // was, so it doesn't skew the "X of Y locations on pace" count.
+  const scored = LOCATIONS.filter(l => healthStatuses[l] === "green" || healthStatuses[l] === "yellow" || healthStatuses[l] === "red");
   if (scored.length === 0) return { text: "Upload financial data to see performance summary.", tone: "neutral" };
 
   const green = scored.filter(l => healthStatuses[l] === "green");

@@ -21,7 +21,7 @@ import { AlertBannerStack, AlertBanner, type AlertBannerItem } from "@/component
 import { FinancialPacketTab } from "@/components/dashboard/FinancialPacketTab";
 import { formatCurrency, formatMarginPct, MARGIN_REVENUE_FLOOR } from "@/lib/formatCurrency";
 
-type HealthStatus = "green" | "yellow" | "red";
+type HealthStatus = "green" | "yellow" | "red" | "gray";
 
 interface LocationData {
   current: MonthlyRecord | null;
@@ -333,6 +333,7 @@ export function DashboardClient({ locationData, packetData, userEmail, role, glI
     }
     const ni = d?.income_statement?.net_income;
     const c = locationData[loc].current;
+    let statusSet = false;
     if (ni && ni.budget !== undefined && ni.budget !== 0 && c?.uploaded_at && c?.month) {
       const locPacing = computeLocPacingPct(c.month, c.uploaded_at);
       if (locPacing !== null) {
@@ -342,8 +343,16 @@ export function DashboardClient({ locationData, packetData, userEmail, role, glI
           if (pct >= -0.10) healthStatuses[loc] = "green";
           else if (pct >= -0.25) healthStatuses[loc] = "yellow";
           else healthStatuses[loc] = "red";
+          statusSet = true;
         }
       }
+    }
+    // No green/yellow/red could be computed but the location is reporting
+    // data (e.g. Uptown pre-opening, no NI budget entered yet) — show a
+    // neutral gray dot instead of no dot at all, so its absence doesn't
+    // read as a UI bug (flagged by Christine 2026-08-23).
+    if (!statusSet && d) {
+      healthStatuses[loc] = "gray";
     }
   }
 

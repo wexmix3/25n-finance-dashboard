@@ -4,7 +4,7 @@ import { LOCATIONS, Location } from "@/types/dashboard";
 
 export type LocationTab = Location | "Consolidated";
 
-type HealthStatus = "green" | "yellow" | "red";
+type HealthStatus = "green" | "yellow" | "red" | "gray";
 
 interface Props {
   active: LocationTab;
@@ -82,9 +82,19 @@ function SidebarItem({
     >
       {health && (
         <span
-          title={`Net Income vs budget: ${health === "green" ? "on track (within 10%)" : health === "yellow" ? "at risk (10–25% miss)" : "off track (>25% miss)"}`}
+          title={
+            health === "gray"
+              ? "Net Income vs budget: no budget set yet (pre-opening or not yet entered)"
+              : `Net Income vs budget: ${health === "green" ? "on track (within 10%)" : health === "yellow" ? "at risk (10–25% miss)" : "off track (>25% miss)"}`
+          }
           className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${
-            health === "green" ? "bg-emerald-400" : health === "yellow" ? "bg-amber-400" : "bg-red-400"
+            health === "green"
+              ? "bg-emerald-400"
+              : health === "yellow"
+              ? "bg-amber-400"
+              : health === "red"
+              ? "bg-red-400"
+              : "bg-gray-400"
           }`}
         />
       )}
