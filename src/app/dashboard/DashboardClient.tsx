@@ -413,8 +413,8 @@ export function DashboardClient({ locationData, packetData, userEmail, role, glI
   return (
     <DashboardShell active={activeTab} onChange={setActiveTab} flagCounts={flagCounts} healthStatuses={healthStatuses}>
       {/* Header */}
-      <header className="bg-white border-b border-gray-200 px-6 py-3.5">
-        <div className="flex items-center justify-end gap-4">
+      <header className="bg-white border-b border-gray-200 px-4 sm:px-6 py-3.5">
+        <div className="flex items-center justify-end gap-2.5 sm:gap-4 flex-wrap">
           {/* Ops/data-health status — one small corner indicator instead of
               full-width banners competing with the business content. */}
           {role === "admin" && (() => {
@@ -422,7 +422,7 @@ export function DashboardClient({ locationData, packetData, userEmail, role, glI
             const label = isStale
               ? `Data ${daysStale}d stale`
               : totalGlIssues > 0
-              ? `${totalGlIssues} GL issue${totalGlIssues !== 1 ? "s" : ""} to review`
+              ? `${totalGlIssues} GL issue${totalGlIssues !== 1 ? "s" : ""} to review across portfolio`
               : "Data current";
             return (
               <div

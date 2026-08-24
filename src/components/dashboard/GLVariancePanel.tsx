@@ -4,6 +4,7 @@ import React, { useState } from "react";
 import type { VarianceFlag } from "@/types/dashboard";
 import { formatCurrency } from "@/lib/formatCurrency";
 import { ItemApproveButton } from "./ItemApproveButton";
+import { ApproveAllButton } from "./ApproveAllButton";
 import { ItemNoteButton } from "./ItemNoteButton";
 import { ItemNoteRow } from "./ItemNoteRow";
 import type { ItemReviewApi, ItemNoteApi } from "./GLCheckTab";
@@ -52,11 +53,14 @@ export function GLVariancePanel({ flags, priorMonth, reviewApi, notesApi }: Prop
 
   return (
     <div className="bg-white rounded-lg border border-gray-200">
-      <div className="px-4 pt-4 pb-3 border-b border-gray-100">
-        <h3 className="text-sm font-semibold text-gray-900">GL Variance Detail</h3>
-        <p className="text-xs text-gray-400 mt-0.5">
-          vs {priorMonth} — {flags.length} account{flags.length !== 1 ? "s" : ""} flagged
-        </p>
+      <div className="px-4 pt-4 pb-3 border-b border-gray-100 flex items-start justify-between gap-3">
+        <div>
+          <h3 className="text-sm font-semibold text-gray-900">GL Variance Detail</h3>
+          <p className="text-xs text-gray-400 mt-0.5">
+            vs {priorMonth} — {flags.length} account{flags.length !== 1 ? "s" : ""} flagged
+          </p>
+        </div>
+        <ApproveAllButton itemType="variance" keys={sorted.map(f => f.account)} reviewApi={reviewApi} />
       </div>
 
       <div className="px-4 py-2.5 bg-gray-50 border-b border-gray-100">

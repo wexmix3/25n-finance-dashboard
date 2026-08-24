@@ -96,7 +96,7 @@ export function DataDictionary() {
         <svg width="12" height="12" viewBox="0 0 16 16" fill="currentColor" aria-hidden>
           <path d="M8 0a8 8 0 100 16A8 8 0 008 0zm0 4a1 1 0 110 2 1 1 0 010-2zm0 3a1 1 0 011 1v4a1 1 0 11-2 0V8a1 1 0 011-1z"/>
         </svg>
-        Data dictionary & sources
+        <span className="hidden sm:inline">Data dictionary & sources</span>
       </button>
 
       {open && (

@@ -4,6 +4,7 @@ import React, { useState } from "react";
 import type { ControlViolation } from "@/types/dashboard";
 import { formatCurrency } from "@/lib/formatCurrency";
 import { ItemApproveButton } from "./ItemApproveButton";
+import { ApproveAllButton } from "./ApproveAllButton";
 import { ItemNoteButton } from "./ItemNoteButton";
 import { ItemNoteRow } from "./ItemNoteRow";
 import type { ItemReviewApi, ItemNoteApi } from "./GLCheckTab";
@@ -22,6 +23,17 @@ function violationKey(v: ControlViolation): string {
 
 function fmtK(v: number): string {
   return formatCurrency(v, { compact: true, zeroDash: false });
+}
+
+// The upstream parser (parse_general_ledger.py) writes messages like
+// "expected one of: ['P', 'K', 'J', 'R']" — a Python list repr, not copy a
+// person should read. Humanize display-side rather than reprocessing every
+// stored record: strips brackets/quotes down to "expected one of: P, K, J, R".
+function humanizeMessage(msg: string): string {
+  return msg.replace(
+    /\[\s*((?:'[^']*'|"[^"]*")(?:\s*,\s*(?:'[^']*'|"[^"]*"))*)\s*\]/g,
+    (_, inner: string) => (inner.match(/'[^']*'|"[^"]*"/g) ?? []).map(s => s.slice(1, -1)).join(", ")
+  );
 }
 
 // Fallback only — every real violation already carries its own specific
@@ -58,11 +70,14 @@ export function ControlViolationsPanel({ violations, reviewApi, notesApi }: Prop
 
   return (
     <div className="bg-white rounded-lg border border-gray-200">
-      <div className="px-4 pt-4 pb-3 border-b border-gray-100">
-        <h3 className="text-sm font-semibold text-gray-900">Control # &amp; Vendor Issues</h3>
-        <p className="text-xs text-gray-400 mt-0.5">
-          {violations.length} transaction{violations.length !== 1 ? "s" : ""} — answers &ldquo;are the account #s correct&rdquo;
-        </p>
+      <div className="px-4 pt-4 pb-3 border-b border-gray-100 flex items-start justify-between gap-3">
+        <div>
+          <h3 className="text-sm font-semibold text-gray-900">Control # &amp; Vendor Issues</h3>
+          <p className="text-xs text-gray-400 mt-0.5">
+            {violations.length} transaction{violations.length !== 1 ? "s" : ""} — answers &ldquo;are the account #s correct&rdquo;
+          </p>
+        </div>
+        <ApproveAllButton itemType="control" keys={sorted.map(violationKey)} reviewApi={reviewApi} />
       </div>
 
       <div className="px-4 py-2.5 bg-gray-50 border-b border-gray-100">
@@ -96,7 +111,7 @@ export function ControlViolationsPanel({ violations, reviewApi, notesApi }: Prop
                     <td className="px-4 py-1.5 text-gray-700 max-w-[160px] truncate">{v.account_name}</td>
                     <td className="px-4 py-1.5 text-gray-500 font-mono">{v.control}</td>
                     <td className="px-4 py-1.5 text-right text-gray-700">{fmtK(v.amount)}</td>
-                    <td className={`px-4 py-1.5 ${approved ? "text-gray-500" : "text-red-600"}`}>{v.message || ISSUE_LABEL_FALLBACK[v.violation_type] || v.violation_type}</td>
+                    <td className={`px-4 py-1.5 ${approved ? "text-gray-500" : "text-red-600"}`}>{humanizeMessage(v.message || ISSUE_LABEL_FALLBACK[v.violation_type] || v.violation_type)}</td>
                     <td className="px-4 py-1.5 text-right">
                       <div className="flex items-center justify-end gap-1">
                         <ItemNoteButton
