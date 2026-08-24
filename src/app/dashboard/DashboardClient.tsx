@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useSyncExternalStore } from "react";
+import { useEffect, useState, useSyncExternalStore } from "react";
 import { useRouter } from "next/navigation";
 import { createBrowserSupabaseClient } from "@/lib/supabase/browser";
 import { LOCATIONS, Location } from "@/types/dashboard";
@@ -8,19 +8,17 @@ import type { MonthlyRecord, TrendPoint, FinancialData, OccupancyData, MonthlyPa
 import { DashboardShell, LocationTab } from "@/components/dashboard/DashboardShell";
 import { PeriodPills } from "@/components/dashboard/PeriodPills";
 import { PeriodBanner } from "@/components/dashboard/PeriodBanner";
-import { IncomeKpiRow } from "@/components/dashboard/IncomeKpiRow";
 import { InsightPanel } from "@/components/dashboard/InsightPanel";
-import { PlTable } from "@/components/dashboard/PlTable";
 import { TrendChart } from "@/components/dashboard/TrendChart";
+import { OverviewPacket } from "@/components/dashboard/OverviewPacket";
 import { OccupancySection, occupancyDeltaLabel, OccupancyTrendChart } from "@/components/dashboard/OccupancySection";
 import { OccupancyHistoryTable } from "@/components/dashboard/OccupancyHistoryTable";
-import { VariancePanel } from "@/components/dashboard/VariancePanel";
 import { LocationSummaryTable } from "@/components/dashboard/LocationSummaryTable";
 import { DataDictionary } from "@/components/dashboard/DataDictionary";
 import { GLCheckTab } from "@/components/dashboard/GLCheckTab";
 import { AlertBannerStack, AlertBanner, type AlertBannerItem } from "@/components/dashboard/AlertBanner";
 import { FinancialPacketTab } from "@/components/dashboard/FinancialPacketTab";
-import { formatCurrency, formatMarginPct, MARGIN_REVENUE_FLOOR } from "@/lib/formatCurrency";
+import { formatCurrency } from "@/lib/formatCurrency";
 
 type HealthStatus = "green" | "yellow" | "red" | "gray";
 
@@ -392,7 +390,6 @@ export function DashboardClient({ locationData, packetData, userEmail, role, glI
     ? computeLocPacingPct(currentMonth, uploadedAt)
     : null;
   const isFullMonth = pacingPct === null || pacingPct >= 1;
-  const runRateFactor = !isFullMonth && pacingPct && pacingPct > 0 ? 1 / pacingPct : null;
 
   // Period-aware trend: 12 months ending at selected period
   const trendEndMonth = selectedMonth ?? locData.availableMonths[0] ?? "";
@@ -474,6 +471,20 @@ export function DashboardClient({ locationData, packetData, userEmail, role, glI
   const activeMonth = selectedMonth ?? locData.availableMonths[0];
 
   const reconNotes = currentData?.reconciliation_notes ?? [];
+
+  // Live refresh: an open (unlocked) period is still being pushed to
+  // through the day by the GL/occupancy pipelines, so the Overview
+  // shouldn't need a manual reload to reflect that. router.refresh()
+  // re-runs the server component (a fresh Supabase read, no client cache),
+  // scoped to whichever period is currently on screen — a locked/closed
+  // period is final by definition and gets no polling. Cleared on
+  // unmount and whenever the locked period changes so switching to a
+  // locked month stops the interval instead of refreshing dead data.
+  useEffect(() => {
+    if (current?.locked) return;
+    const id = setInterval(() => router.refresh(), 5 * 60 * 1000);
+    return () => clearInterval(id);
+  }, [current?.locked, current?.month, activeLocation, router]);
 
   async function handleSignOut() {
     const supabase = createBrowserSupabaseClient();
@@ -758,114 +769,53 @@ export function DashboardClient({ locationData, packetData, userEmail, role, glI
           </>
         )}
 
-        {/* Overview view — headline-first design (2026-08-18 Round 1), now
-            the only Overview, no Executive/Finance mode switch. */}
+        {/* Overview view — packet-style layout (2026-08-25 Round 2, matching
+            the layout Christine flagged from her own Frisco "Dashboard"
+            tab): brand title band + KPI strip + chart trio, then five
+            numbered accounting sections. Replaces the prior hero/KPI-row/
+            P&L-table layout entirely rather than stacking both. */}
         {activeView === "overview" && currentData ? (() => {
-          const is = currentData.income_statement;
-          const ni = is.net_income.actual;
-          const niMargin = is.net_income.margin_pct;
-          const niVsBudget = ni - is.net_income.budget;
-          const occDeltaLoc = occupancyDeltaLabel(occupancy?.occupancy_pct ?? undefined, priorOccupancy?.occupancy_pct ?? undefined);
           const heroInsight = currentData.insights?.[0];
           const heroDetail = currentData.insights?.[1];
+          const occupancyTrend = locData.allOccupancy.map(o => ({ month: o.month, occupancy_pct: o.data?.occupancy_pct ?? null }));
           return (
-            // Two-column desktop layout (finding #11): left = insight/hero/
-            // trend, right = KPI row/variance, P&L stays full-width below
-            // both. Grid-template-areas so the DOM order can still define a
-            // sensible single-column mobile reading order (insight → hero →
-            // KPI → trend → P&L → variance) independent of the desktop
-            // column split — a plain flex/order approach can't place items
-            // into two aligned columns and still control mobile order
-            // separately, template-areas can.
-            <div
-              className={[
-                "grid grid-cols-1 gap-5 lg:grid-cols-2 lg:gap-x-8 lg:gap-y-5 lg:items-start",
-                "[grid-template-areas:'insight'_'hero'_'occupancy'_'kpi'_'trend'_'pltable'_'variance']",
-                "lg:[grid-template-areas:'insight_insight'_'hero_occupancy'_'kpi_kpi'_'trend_variance'_'pltable_pltable']",
-              ].join(" ")}
-            >
-              <div className="[grid-area:insight] space-y-2.5">
-                <InsightPanel
-                  insight={heroInsight ?? `Net Income for ${currentMonth}`}
-                  detail={heroDetail}
-                  actionLabel="View GL Check"
-                  onAction={() => setActiveView("gl")}
-                />
+            <div className="space-y-5">
+              <InsightPanel
+                insight={heroInsight ?? `Net Income for ${currentMonth}`}
+                detail={heroDetail}
+                actionLabel="View GL Check"
+                onAction={() => setActiveView("gl")}
+              />
 
-                {/* Stale-data + reconciliation-flag warnings — both can be
-                    active at once on Overview; capped to showing the single
-                    highest-priority one inline with a "+N more" affordance
-                    instead of stacking every active banner. Stale data ranks
-                    first (data currency is the more fundamental trust signal). */}
-                {(() => {
-                  const items: AlertBannerItem[] = [];
-                  if (isStale) {
-                    items.push({ key: "stale", message: `Data last updated ${daysStale} days ago — verify this reflects the current close period.` });
-                  }
-                  if (reconNotes.length > 0) {
-                    items.push({ key: "recon", title: "Reconciliation Flag", message: reconNotes.join(" ") });
-                  }
-                  return <AlertBannerStack items={items} />;
-                })()}
-              </div>
+              {/* Stale-data + reconciliation-flag warnings — both can be
+                  active at once on Overview; capped to showing the single
+                  highest-priority one inline with a "+N more" affordance
+                  instead of stacking every active banner. Stale data ranks
+                  first (data currency is the more fundamental trust signal). */}
+              {(() => {
+                const items: AlertBannerItem[] = [];
+                if (isStale) {
+                  items.push({ key: "stale", message: `Data last updated ${daysStale} days ago — verify this reflects the current close period.` });
+                }
+                if (reconNotes.length > 0) {
+                  items.push({ key: "recon", title: "Reconciliation Flag", message: reconNotes.join(" ") });
+                }
+                return <AlertBannerStack items={items} />;
+              })()}
 
-              {/* Hero pair: Net Income + Occupancy, boxed and filling the full row width */}
-              <div className="[grid-area:hero]">
-                <HeroCard
-                  label={`Net Income · ${currentMonth}`}
-                  value={fmtExec(ni)}
-                  valueNegative={ni < 0}
-                  sub={
-                    (Math.abs(is.revenue._total.actual) < MARGIN_REVENUE_FLOOR
-                      ? formatMarginPct(niMargin, is.revenue._total.actual)
-                      : `${formatMarginPct(niMargin, is.revenue._total.actual)} margin`) +
-                    ` · ${formatCurrency(niVsBudget, { compact: true, showSign: true })} vs budget`
-                  }
-                />
-              </div>
-
-              <div className="[grid-area:occupancy]">
-                <HeroCard
-                  label={`Occupancy · ${currentMonth}`}
-                  value={occupancy?.occupancy_pct != null ? `${Math.round(occupancy.occupancy_pct)}%` : "—"}
-                  sub={
-                    occupancy?.occupancy_pct == null
-                      ? "No occupancy data yet for this period"
-                      : occDeltaLoc ?? undefined
-                  }
-                />
-              </div>
-
-              {/* KPI row — prorated vs budget */}
-              <div className="[grid-area:kpi]">
-                <IncomeKpiRow
-                  current={currentData}
-                  prior={priorData}
-                  runRateFactor={runRateFactor}
-                  pacingPct={isFullMonth ? null : pacingPct}
-                />
-              </div>
-
-              <div className="[grid-area:trend]">
-                <TrendChart data={periodTrend} />
-              </div>
-
-              {/* Full income statement — collapsed line items by default,
-                  "Show full breakdown" (inside PlTable) reveals detail. */}
-              <div className="[grid-area:pltable]">
-                <PlTable current={currentData} prior={priorData} pacingPct={isFullMonth ? null : pacingPct} />
-              </div>
-
-              {/* Variance analysis — section-level flags only; account-level detail lives on GL Check */}
-              <div className="[grid-area:variance]">
-                <VariancePanel
-                  current={currentData}
-                  prior={priorData}
-                  glFlags={[]}
-                  priorMonth={priorMonth}
-                  pacingPct={isFullMonth ? null : pacingPct}
-                />
-              </div>
+              <OverviewPacket
+                location={activeLocation}
+                currentData={currentData}
+                priorData={priorData}
+                occupancy={occupancy}
+                priorOccupancy={priorOccupancy}
+                trend={periodTrend}
+                occupancyTrend={occupancyTrend}
+                packet={packetData[activeLocation] ?? null}
+                locked={current?.locked ?? false}
+                uploadedAt={current?.uploaded_at}
+                pacingPct={isFullMonth ? null : pacingPct}
+              />
             </div>
           );
         })() : activeView === "overview" ? (

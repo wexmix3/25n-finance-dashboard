@@ -5,6 +5,13 @@ import type { Location, MonthlyRecord, TrendPoint, OccupancyData, MonthlyPacket,
 import { LOCATIONS } from "@/types/dashboard";
 import { normalizeFinancialData } from "@/lib/normalize-financial-data";
 
+// Unlocked periods are still being written to by the GL/occupancy pipelines
+// through the day — DashboardClient polls via router.refresh() while an
+// unlocked period is on screen, which re-runs this server component. Force
+// it to always re-read Supabase rather than let Vercel serve a cached
+// render, or that polling would just re-fetch the same stale response.
+export const dynamic = "force-dynamic";
+
 const MONTH_NAMES = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 
 // "Jun 2026" -> 2026*12 + 5, so numeric comparison is chronological. `month` is
