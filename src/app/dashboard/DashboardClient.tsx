@@ -218,22 +218,41 @@ const SPACE_TYPE_PREFIX: Record<Exclude<OccupancyMetric, "total">, string> = {
  * Space's own field, (2) an explicit backfilled percentage (the only option
  * for Jan-Jul, which came from Tracey's file as a rate with no per-unit
  * counts), (3) aggregated from space_breakdown's real unit counts (Kube-
- * sourced live months only -- Aug 2026 onward). Returns null, never 0, when
- * a location simply hasn't reported that space type that month, so it
- * renders as "—" rather than a misleading zero. */
+ * sourced live months only -- Aug 2026 onward).
+ *
+ * A literal 0% is canonicalized to null (same as "never reported"), not
+ * displayed as a real zero -- confirmed with Max 2026-08-25 using Uptown as
+ * the concrete case: it's pre-opening, so a bare "0%" reads as "empty and
+ * failing" when the truth is "hasn't opened yet, nothing to measure." Same
+ * convention already used for hardcoded financial-statement zeros
+ * (rendered as "-", not "0"). Applies to every location uniformly, not just
+ * Uptown -- no other active location has posted a real 0% in this dataset,
+ * so this can't currently hide a genuine occupancy-collapse signal, but
+ * revisit this rule if one ever does. */
 function occupancyMetricValue(data: OccupancyData | null | undefined, metric: OccupancyMetric): number | null {
   if (!data) return null;
-  if (metric === "total") return data.occupancy_pct ?? null;
 
-  const explicit = metric === "private_office" ? data.raw.private_office_pct : data.raw.dedicated_desk_pct;
-  if (explicit != null) return explicit;
+  let value: number | null;
+  if (metric === "total") {
+    value = data.occupancy_pct ?? null;
+  } else {
+    const explicit = metric === "private_office" ? data.raw.private_office_pct : data.raw.dedicated_desk_pct;
+    if (explicit != null) {
+      value = explicit;
+    } else {
+      const prefix = SPACE_TYPE_PREFIX[metric];
+      const matching = (data.raw.space_breakdown ?? []).filter(sb => sb.space_type.startsWith(prefix));
+      if (matching.length === 0) {
+        value = null;
+      } else {
+        const total = matching.reduce((sum, sb) => sum + sb.total_units, 0);
+        const occupied = matching.reduce((sum, sb) => sum + sb.occupied_units, 0);
+        value = total > 0 ? Math.round((occupied / total) * 1000) / 10 : null;
+      }
+    }
+  }
 
-  const prefix = SPACE_TYPE_PREFIX[metric];
-  const matching = (data.raw.space_breakdown ?? []).filter(sb => sb.space_type.startsWith(prefix));
-  if (matching.length === 0) return null;
-  const total = matching.reduce((sum, sb) => sum + sb.total_units, 0);
-  const occupied = matching.reduce((sum, sb) => sum + sb.occupied_units, 0);
-  return total > 0 ? Math.round((occupied / total) * 1000) / 10 : null;
+  return value === 0 ? null : value;
 }
 
 /** Per-location occupancy history, one row per month, for a single metric
