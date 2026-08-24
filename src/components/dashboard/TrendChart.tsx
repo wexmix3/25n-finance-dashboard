@@ -16,10 +16,6 @@ import {
 
 interface Props {
   data: TrendPoint[];
-  // Consolidated's occupancy table now carries the detailed numbers, so
-  // this chart sits alongside the occupancy trend chart instead of running
-  // full-width -- shorter height keeps the pair from dominating the page.
-  compact?: boolean;
 }
 
 function fmtK(n: number): string {
@@ -66,7 +62,7 @@ function renderLegend() {
   );
 }
 
-export function TrendChart({ data, compact }: Props) {
+export function TrendChart({ data }: Props) {
   if (data.length === 0) {
     return (
       <div className="bg-white rounded-lg border border-gray-200 p-6 flex items-center justify-center h-56">
@@ -82,7 +78,7 @@ export function TrendChart({ data, compact }: Props) {
   return (
     <div className="bg-white rounded-lg border border-gray-200 shadow-sm p-4">
       <h3 className="text-sm font-bold text-gray-900 mb-4">Revenue & Net Income Trend</h3>
-      <ResponsiveContainer width="100%" height={compact ? 220 : 360} debounce={200}>
+      <ResponsiveContainer width="100%" height={360} debounce={200}>
         <AreaChart data={chartData} margin={{ top: 8, right: 16, left: 8, bottom: 4 }}>
           <defs>
             <linearGradient id="fillRevenue" x1="0" y1="0" x2="0" y2="1">

@@ -202,13 +202,53 @@ function computePortfolioOccupancyTrend(locationData: Record<Location, LocationD
  * ("the table, not the chart") alongside the existing blended trend chart.
  * Same 2026-only scope and same allOccupancy source as
  * computePortfolioOccupancyTrend above, so the two views can't disagree. */
-function computeOccupancyHistoryRows(locationData: Record<Location, LocationData>): { month: string; byLocation: Partial<Record<Location, number | null>> }[] {
+export type OccupancyMetric = "total" | "private_office" | "dedicated_desk";
+
+// Space-type prefixes matching the CORE_TYPE_PREFIXES convention already
+// used in parse_kube_api_occupancy.py / push_manual_occupancy.py -- handles
+// per-sub-location suffixed names too (e.g. Schaumburg's Kube data reports
+// "Private Office - Huddle Up" and "Private Office - Amara Club" as
+// separate entries, both need to roll into one Private Office figure).
+const SPACE_TYPE_PREFIX: Record<Exclude<OccupancyMetric, "total">, string> = {
+  private_office: "Private Office",
+  dedicated_desk: "Dedicated Desk",
+};
+
+/** Reads one occupancy metric off a record, in priority order: (1) Total
+ * Space's own field, (2) an explicit backfilled percentage (the only option
+ * for Jan-Jul, which came from Tracey's file as a rate with no per-unit
+ * counts), (3) aggregated from space_breakdown's real unit counts (Kube-
+ * sourced live months only -- Aug 2026 onward). Returns null, never 0, when
+ * a location simply hasn't reported that space type that month, so it
+ * renders as "—" rather than a misleading zero. */
+function occupancyMetricValue(data: OccupancyData | null | undefined, metric: OccupancyMetric): number | null {
+  if (!data) return null;
+  if (metric === "total") return data.occupancy_pct ?? null;
+
+  const explicit = metric === "private_office" ? data.raw.private_office_pct : data.raw.dedicated_desk_pct;
+  if (explicit != null) return explicit;
+
+  const prefix = SPACE_TYPE_PREFIX[metric];
+  const matching = (data.raw.space_breakdown ?? []).filter(sb => sb.space_type.startsWith(prefix));
+  if (matching.length === 0) return null;
+  const total = matching.reduce((sum, sb) => sum + sb.total_units, 0);
+  const occupied = matching.reduce((sum, sb) => sum + sb.occupied_units, 0);
+  return total > 0 ? Math.round((occupied / total) * 1000) / 10 : null;
+}
+
+/** Per-location occupancy history, one row per month, for a single metric
+ * (Total Space / Private Office / Dedicated Desk) — feeds
+ * OccupancyHistoryTable, the per-location breakdown Christine asked for
+ * ("the table, not the chart") alongside the existing blended trend chart.
+ * Same 2026-only scope and same allOccupancy source as
+ * computePortfolioOccupancyTrend above, so none of these views can disagree. */
+function computeOccupancyHistoryRows(locationData: Record<Location, LocationData>, metric: OccupancyMetric): { month: string; byLocation: Partial<Record<Location, number | null>> }[] {
   const byMonth = new Map<string, Partial<Record<Location, number | null>>>();
   for (const loc of LOCATIONS) {
     for (const { month, data } of locationData[loc].allOccupancy) {
       if (!month.endsWith("2026")) continue;
       const row = byMonth.get(month) ?? {};
-      row[loc] = data?.occupancy_pct ?? null;
+      row[loc] = occupancyMetricValue(data, metric);
       byMonth.set(month, row);
     }
   }
@@ -516,25 +556,36 @@ export function DashboardClient({ locationData, packetData, userEmail, role, glI
                 />
               </div>
 
-              <OccupancyHistoryTable rows={computeOccupancyHistoryRows(locationData)} />
-
-              {/* Trend charts, side by side rather than stacked -- keeps
-                  this section from dominating the page now that the
-                  occupancy table above carries the detailed numbers. */}
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-                {portfolioTrend.length > 0 && (
-                  <TrendChart data={portfolioTrend} compact />
-                )}
-
-                {(() => {
-                  const portfolioOccTrend = computePortfolioOccupancyTrend(locationData);
-                  return portfolioOccTrend.filter(p => p.occupancy_pct != null).length >= 2 ? (
-                    <div className="bg-white rounded-lg border border-gray-200">
-                      <OccupancyTrendChart history={portfolioOccTrend} title="Portfolio Occupancy — 2026" />
-                    </div>
-                  ) : null;
-                })()}
+              {/* Occupancy: three stacked tables, Total Space highlighted with
+                  a glow ring on top, then the blended portfolio trend chart
+                  right after (2026-08-25, Max's final layout call). */}
+              <div className="space-y-4">
+                <OccupancyHistoryTable
+                  title="Total Space Occupancy — 2026"
+                  subtitle="Month over month across all 5 locations"
+                  rows={computeOccupancyHistoryRows(locationData, "total")}
+                  highlight="glow-ring"
+                />
+                <OccupancyHistoryTable
+                  title="Private Office Occupancy — 2026"
+                  subtitle="Month over month across all 5 locations"
+                  rows={computeOccupancyHistoryRows(locationData, "private_office")}
+                />
+                <OccupancyHistoryTable
+                  title="Dedicated Desk Occupancy — 2026"
+                  subtitle="Month over month across all 5 locations"
+                  rows={computeOccupancyHistoryRows(locationData, "dedicated_desk")}
+                />
               </div>
+
+              {(() => {
+                const portfolioOccTrend = computePortfolioOccupancyTrend(locationData);
+                return portfolioOccTrend.filter(p => p.occupancy_pct != null).length >= 2 ? (
+                  <div className="bg-white rounded-lg border border-gray-200">
+                    <OccupancyTrendChart history={portfolioOccTrend} title="Portfolio Occupancy — 2026" />
+                  </div>
+                ) : null;
+              })()}
 
               {/* Drill-down grid — the second click, not the first thing seen */}
               <div className="space-y-2">
@@ -557,6 +608,10 @@ export function DashboardClient({ locationData, packetData, userEmail, role, glI
                   selectedMonth={consolidatedMonth}
                 />
               </div>
+
+              {portfolioTrend.length > 0 && (
+                <TrendChart data={portfolioTrend} />
+              )}
             </div>
           );
         })() : (

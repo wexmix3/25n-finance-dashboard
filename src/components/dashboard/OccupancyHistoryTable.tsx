@@ -2,12 +2,17 @@
 
 import { LOCATIONS, Location } from "@/types/dashboard";
 
+export type OccupancyHighlight = "none" | "glow-ring";
+
 interface Props {
+  title: string;
+  subtitle: string;
   // month -> location -> occupancy_pct (null when that location hasn't
   // reported that month yet). Pre-computed by the caller from the same
   // allOccupancy source the portfolio trend chart already reads, so this
   // table and that chart can never disagree about what "occupancy" means.
   rows: { month: string; byLocation: Partial<Record<Location, number | null>> }[];
+  highlight?: OccupancyHighlight;
 }
 
 // Matches LocationSummaryTable's fixed-width convention so a wide value in
@@ -35,7 +40,7 @@ function average(values: number[]): number | null {
   return values.length > 0 ? values.reduce((a, b) => a + b, 0) / values.length : null;
 }
 
-export function OccupancyHistoryTable({ rows }: Props) {
+export function OccupancyHistoryTable({ title, subtitle, rows, highlight = "none" }: Props) {
   if (rows.length === 0) return null;
 
   // Grand-total row (bottom, bolded) -- per-location average across every
@@ -48,10 +53,10 @@ export function OccupancyHistoryTable({ rows }: Props) {
   const overallAverage = average(Object.values(locationAverages).filter((v): v is number => v != null));
 
   return (
-    <div className="bg-white rounded-lg border border-gray-200 overflow-x-auto">
+    <div className={`bg-white rounded-lg border border-gray-200 overflow-x-auto ${highlight === "glow-ring" ? "occ-highlight-glow-ring" : ""}`}>
       <div className="px-4 pt-4 pb-3 border-b border-gray-100">
-        <h3 className="text-sm font-bold text-gray-900">Occupancy by Location — 2026</h3>
-        <p className="text-xs text-gray-400 mt-0.5">Total space occupancy, month over month across all 5 locations</p>
+        <h3 className="text-sm font-bold text-gray-900">{title}</h3>
+        <p className="text-xs text-gray-400 mt-0.5">{subtitle}</p>
       </div>
       <table className="w-full min-w-[640px] border-collapse">
         <thead>

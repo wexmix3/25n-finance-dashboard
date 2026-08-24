@@ -179,6 +179,12 @@ export interface OccupancyData {
     ytd_occupancy_pct?: number;
     ytd_revenue?: number;
     space_breakdown?: OccupancySpaceType[];
+    // Set directly for months backfilled from Tracey's Consolidated Dashboard
+    // file (no per-unit counts available, just the rate). For Kube-sourced
+    // months these are absent -- compute from space_breakdown instead, which
+    // has real per-space-type unit counts.
+    private_office_pct?: number | null;
+    dedicated_desk_pct?: number | null;
     source_file?: string;
     [key: string]: unknown;
   };

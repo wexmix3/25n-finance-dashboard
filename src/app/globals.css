@@ -20,3 +20,25 @@ body {
   color: var(--foreground);
   font-family: var(--font-sans), ui-sans-serif, system-ui, sans-serif;
 }
+
+/* Occupancy table highlight (Consolidated page, Total Space table) --
+   picked from a click-through set of options, 2026-08-25. */
+@keyframes occ-glow-pulse {
+  0%, 100% {
+    box-shadow: 0 0 0 1px rgba(241, 91, 39, 0.25), 0 0 16px 2px rgba(241, 91, 39, 0.18);
+  }
+  50% {
+    box-shadow: 0 0 0 1px rgba(241, 91, 39, 0.4), 0 0 28px 6px rgba(241, 91, 39, 0.32);
+  }
+}
+
+.occ-highlight-glow-ring {
+  animation: occ-glow-pulse 3s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .occ-highlight-glow-ring {
+    animation: none;
+    box-shadow: 0 0 0 1px rgba(241, 91, 39, 0.3), 0 0 16px 2px rgba(241, 91, 39, 0.2);
+  }
+}
