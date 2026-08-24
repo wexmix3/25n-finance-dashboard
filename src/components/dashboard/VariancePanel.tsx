@@ -193,8 +193,10 @@ export function VariancePanel({ current, prior, glFlags = [], priorMonth, pacing
                   <div className="px-4 py-2.5 bg-gray-50 border-b border-gray-100">
                     <p className="text-[11px] text-gray-500">
                       <span className="font-semibold text-gray-600">Flag rule:</span>{" "}
-                      prior $0 → flag if current exceeds $500 (new activity) · prior over $1,000 → flag if change
-                      exceeds the larger of $500 or 20% of prior · prior $1–$1,000 → flag if change exceeds $500.
+                      Revenue accounts flag if change exceeds $1,000 · COS/OPEX accounts flag if change exceeds
+                      $500 · everything else (balance sheet, other income/expense, unmapped codes): prior $0 →
+                      flag if current exceeds $500 (new activity) · prior over $1,000 → flag if change exceeds
+                      the larger of $500 or 20% of prior · prior $1–$1,000 → flag if change exceeds $500.
                       Listed oldest-to-newest by account code.
                     </p>
                   </div>
