@@ -516,20 +516,25 @@ export function DashboardClient({ locationData, packetData, userEmail, role, glI
                 />
               </div>
 
-              {portfolioTrend.length > 0 && (
-                <TrendChart data={portfolioTrend} />
-              )}
-
-              {(() => {
-                const portfolioOccTrend = computePortfolioOccupancyTrend(locationData);
-                return portfolioOccTrend.filter(p => p.occupancy_pct != null).length >= 2 ? (
-                  <div className="bg-white rounded-lg border border-gray-200">
-                    <OccupancyTrendChart history={portfolioOccTrend} title="Portfolio Occupancy — 2026" />
-                  </div>
-                ) : null;
-              })()}
-
               <OccupancyHistoryTable rows={computeOccupancyHistoryRows(locationData)} />
+
+              {/* Trend charts, side by side rather than stacked -- keeps
+                  this section from dominating the page now that the
+                  occupancy table above carries the detailed numbers. */}
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                {portfolioTrend.length > 0 && (
+                  <TrendChart data={portfolioTrend} compact />
+                )}
+
+                {(() => {
+                  const portfolioOccTrend = computePortfolioOccupancyTrend(locationData);
+                  return portfolioOccTrend.filter(p => p.occupancy_pct != null).length >= 2 ? (
+                    <div className="bg-white rounded-lg border border-gray-200">
+                      <OccupancyTrendChart history={portfolioOccTrend} title="Portfolio Occupancy — 2026" />
+                    </div>
+                  ) : null;
+                })()}
+              </div>
 
               {/* Drill-down grid — the second click, not the first thing seen */}
               <div className="space-y-2">
