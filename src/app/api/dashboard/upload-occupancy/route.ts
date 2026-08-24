@@ -53,7 +53,7 @@ export async function POST(request: NextRequest) {
   const results: { location: string; month: string; status: string }[] = [];
 
   for (const record of records) {
-    const { location, month, lock } = record as { location: string; month: string; lock?: boolean };
+    const { location, month, lock, unlock } = record as { location: string; month: string; lock?: boolean; unlock?: boolean };
     if (!location || !month) {
       results.push({ location: location ?? "?", month: month ?? "?", status: "missing location or month" });
       continue;
@@ -65,6 +65,22 @@ export async function POST(request: NextRequest) {
       .eq("location", location)
       .eq("month", month)
       .single();
+
+    // `unlock` is the one deliberate exception to the guard below -- it's
+    // for the rare case a month gets reopened after being locked too early
+    // (e.g. a month manually locked before this route's month-end-only lock
+    // convention existed). It only ever flips locked true -> false and never
+    // touches `data`, so it can't be used to sneak a data change past an
+    // intentionally locked record.
+    if (unlock) {
+      const { error } = await supabase
+        .from("monthly_occupancy")
+        .update({ locked: false })
+        .eq("location", location)
+        .eq("month", month);
+      results.push({ location, month, status: error ? `error: ${error.message}` : "unlocked" });
+      continue;
+    }
 
     if (existing?.locked) {
       results.push({ location, month, status: "locked — not updated" });
