@@ -103,7 +103,7 @@ export function OverviewPacket({
   const opNI = is.net_operating_income.actual;
   const priorOpNI = priorData?.income_statement.net_operating_income.actual;
 
-  const bsSummary = packet?.data.balance_sheet && !packet.data.balance_sheet.error && packet.month === currentData.month
+  const bsSummary = packet?.data.balance_sheet && !packet.data.balance_sheet.error
     ? packet.data.balance_sheet.summary
     : null;
   const currentAssets = bsSummary ? bsSummary.cash_and_bank + bsSummary.receivables + bsSummary.prepaid_and_other : null;
@@ -238,7 +238,7 @@ export function OverviewPacket({
             </div>
           ) : (
             <p className="text-xs text-gray-400 px-5 py-6">
-              No Balance Sheet packet on file for {currentData.month}{packet ? ` — latest available is ${packet.month}` : ""}. Generate a Financial Packet for this period to populate this section.
+              No Balance Sheet packet on file for {currentData.month}. Generate a Financial Packet for this period to populate this section.
             </p>
           )}
         </SectionShell>

@@ -126,10 +126,14 @@ export default async function DashboardPage() {
     };
   }
 
-  // Build per-location packet map (latest packet per location)
-  const packetData: Record<Location, MonthlyPacket | null> = {} as Record<Location, MonthlyPacket | null>;
+  // Per-location packet history — every generated packet, not just the
+  // latest. A single "latest packet" silently showed the wrong period's
+  // Balance Sheet/AR/AP/Cash Flow whenever a newer month's packet existed
+  // (e.g. viewing April after May's packet was generated) — callers now
+  // look up the packet matching whichever period is on screen.
+  const packetData: Record<Location, MonthlyPacket[]> = {} as Record<Location, MonthlyPacket[]>;
   for (const loc of LOCATIONS) {
-    packetData[loc] = (packetRecords ?? []).find((r: MonthlyPacket) => r.location === loc) ?? null;
+    packetData[loc] = (packetRecords ?? []).filter((r: MonthlyPacket) => r.location === loc);
   }
 
   // Get user role

@@ -36,7 +36,7 @@ interface LocationData {
 
 interface Props {
   locationData: Record<Location, LocationData>;
-  packetData: Record<Location, MonthlyPacket | null>;
+  packetData: Record<Location, MonthlyPacket[]>;
   userEmail: string;
   role: string;
   glItemReviews: GlItemReview[];
@@ -740,7 +740,7 @@ export function DashboardClient({ locationData, packetData, userEmail, role, glI
           currentData ? (
             <FinancialPacketTab
               currentData={currentData}
-              packet={packetData[activeLocation] ?? null}
+              packet={packetData[activeLocation]?.find(p => p.month === currentData.month) ?? null}
             />
           ) : (
             <NoLocationData location={activeLocation} detail="Financial data for this location hasn't been uploaded yet." />
@@ -811,7 +811,7 @@ export function DashboardClient({ locationData, packetData, userEmail, role, glI
                 priorOccupancy={priorOccupancy}
                 trend={periodTrend}
                 occupancyTrend={occupancyTrend}
-                packet={packetData[activeLocation] ?? null}
+                packet={packetData[activeLocation]?.find(p => p.month === currentData.month) ?? null}
                 locked={current?.locked ?? false}
                 uploadedAt={current?.uploaded_at}
                 pacingPct={isFullMonth ? null : pacingPct}
