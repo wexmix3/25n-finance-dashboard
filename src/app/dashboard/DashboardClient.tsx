@@ -13,6 +13,7 @@ import { InsightPanel } from "@/components/dashboard/InsightPanel";
 import { PlTable } from "@/components/dashboard/PlTable";
 import { TrendChart } from "@/components/dashboard/TrendChart";
 import { OccupancySection, occupancyDeltaLabel, OccupancyTrendChart } from "@/components/dashboard/OccupancySection";
+import { OccupancyHistoryTable } from "@/components/dashboard/OccupancyHistoryTable";
 import { VariancePanel } from "@/components/dashboard/VariancePanel";
 import { LocationSummaryTable } from "@/components/dashboard/LocationSummaryTable";
 import { DataDictionary } from "@/components/dashboard/DataDictionary";
@@ -194,6 +195,26 @@ function computePortfolioOccupancyTrend(locationData: Record<Location, LocationD
   return [...byMonth.entries()]
     .sort((a, b) => monthSortKeyLocal(a[0]) - monthSortKeyLocal(b[0]))
     .map(([month, { sum, count }]) => ({ month, occupancy_pct: count > 0 ? sum / count : null }));
+}
+
+/** Per-location occupancy history, one row per month — feeds
+ * OccupancyHistoryTable, the per-location breakdown Christine asked for
+ * ("the table, not the chart") alongside the existing blended trend chart.
+ * Same 2026-only scope and same allOccupancy source as
+ * computePortfolioOccupancyTrend above, so the two views can't disagree. */
+function computeOccupancyHistoryRows(locationData: Record<Location, LocationData>): { month: string; byLocation: Partial<Record<Location, number | null>> }[] {
+  const byMonth = new Map<string, Partial<Record<Location, number | null>>>();
+  for (const loc of LOCATIONS) {
+    for (const { month, data } of locationData[loc].allOccupancy) {
+      if (!month.endsWith("2026")) continue;
+      const row = byMonth.get(month) ?? {};
+      row[loc] = data?.occupancy_pct ?? null;
+      byMonth.set(month, row);
+    }
+  }
+  return [...byMonth.entries()]
+    .sort((a, b) => monthSortKeyLocal(a[0]) - monthSortKeyLocal(b[0]))
+    .map(([month, byLocation]) => ({ month, byLocation }));
 }
 
 /** Boxed headline stat — the Net Income / Occupancy hero pair at the top of
@@ -507,6 +528,8 @@ export function DashboardClient({ locationData, packetData, userEmail, role, glI
                   </div>
                 ) : null;
               })()}
+
+              <OccupancyHistoryTable rows={computeOccupancyHistoryRows(locationData)} />
 
               {/* Drill-down grid — the second click, not the first thing seen */}
               <div className="space-y-2">
