@@ -773,6 +773,7 @@ export function DashboardClient({ locationData, packetData, userEmail, role, glI
                 priorOccupancy={priorOccupancy}
                 trend={periodTrend}
                 occupancyTrend={occupancyTrend}
+                records={locData.allRecords}
                 packet={packetData[activeLocation]?.find(p => p.month === currentData.month) ?? null}
                 locked={current?.locked ?? false}
                 uploadedAt={current?.uploaded_at}

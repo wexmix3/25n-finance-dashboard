@@ -2,7 +2,7 @@
 
 import type { OccupancyData } from "@/types/dashboard";
 import { formatCurrency } from "@/lib/formatCurrency";
-import { BarChart, Bar, Cell, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
+import { BarChart, Bar, Cell, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, LabelList } from "recharts";
 import { occupancyMetricValue, occupancyMetricUnits } from "@/lib/occupancy";
 
 interface Props {
@@ -65,8 +65,17 @@ export function OccupancyTrendChart({ history, title = "6-Month Occupancy Trend"
           />
           <Bar dataKey="occupancy_pct" name="Occupancy" radius={[3, 3, 0, 0]}>
             {chartData.map((d, i) => (
-              <Cell key={d.month} fill={i === lastIndex ? "#F15B27" : "#F9C4AB"} />
+              // Prior months in neutral gray, current month in brand orange
+              // -- was a peach shade on every bar, which read as "all the
+              // same" and buried the current period (Christine, 2026-08-25).
+              <Cell key={d.month} fill={i === lastIndex ? "#F15B27" : "#D1D5DB"} />
             ))}
+            <LabelList
+              dataKey="occupancy_pct"
+              position="top"
+              formatter={(v: unknown) => (v == null ? "" : `${v}%`)}
+              style={{ fontSize: 10, fontWeight: 600, fill: "#6b7280" }}
+            />
           </Bar>
         </BarChart>
       </ResponsiveContainer>

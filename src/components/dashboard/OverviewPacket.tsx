@@ -1,7 +1,7 @@
 "use client";
 
 import { useSyncExternalStore } from "react";
-import type { Location, FinancialData, OccupancyData, TrendPoint, MonthlyPacket, LineItem } from "@/types/dashboard";
+import type { Location, FinancialData, OccupancyData, TrendPoint, MonthlyPacket, LineItem, MonthlyRecord } from "@/types/dashboard";
 import { formatCurrency, formatSignedPct, MARGIN_REVENUE_FLOOR } from "@/lib/formatCurrency";
 import {
   BarChart, Bar, Cell, XAxis, YAxis, CartesianGrid, Tooltip as RTooltip, ResponsiveContainer,
@@ -12,6 +12,11 @@ interface Props {
   location: Location;
   currentData: FinancialData;
   priorData: FinancialData | null;
+  /** Every month on file for this location -- used to compute YTD figures
+   * on the KPI strip (Christine's "add YTD to these boxes" request). Same
+   * source and same year-to-date-through-current-month definition as
+   * LocationSummaryTable's Consolidated YTD row, so the two can't disagree. */
+  records: MonthlyRecord[];
   occupancy: OccupancyData | null;
   priorOccupancy: OccupancyData | null;
   /** Up to 12 months, chronological, ending at the currently viewed period. */
@@ -30,6 +35,24 @@ interface Props {
 const BRAND = "#F15B27";
 const NEG = "#dc2626";
 const MIX_COLORS = ["#F15B27", "#f5a15a", "#2c5a82", "#6b9bc3", "#9aa5b1", "#c9cfd6"];
+
+// Same year-to-date-through-current-month definition as LocationSummaryTable's
+// computeYTD, extended to opex since the KPI strip needs a Total Expenses
+// YTD figure that table doesn't.
+function computeYTDTotals(records: MonthlyRecord[], currentMonth: string): { revenue: number; opex: number; opNI: number } | null {
+  const [, yearStr] = currentMonth.split(" ");
+  if (!yearStr) return null;
+  const ytdRecords = records.filter(r => r.month.endsWith(yearStr));
+  if (ytdRecords.length === 0) return null;
+  return ytdRecords.reduce(
+    (acc, r) => ({
+      revenue: acc.revenue + (r.data?.income_statement?.revenue?._total?.actual ?? 0),
+      opex: acc.opex + (r.data?.income_statement?.opex?._total?.actual ?? 0),
+      opNI: acc.opNI + (r.data?.income_statement?.net_operating_income?.actual ?? 0),
+    }),
+    { revenue: 0, opex: 0, opNI: 0 }
+  );
+}
 
 function fmt(n: number | undefined | null, compact = false): string {
   if (n == null) return "—";
@@ -91,12 +114,14 @@ function SectionShell({ children }: { children: React.ReactNode }) {
 }
 
 export function OverviewPacket({
-  location, currentData, priorData, occupancy, priorOccupancy, trend, occupancyTrend, packet, locked, uploadedAt, pacingPct,
+  location, currentData, priorData, occupancy, priorOccupancy, trend, occupancyTrend, packet, locked, uploadedAt, pacingPct, records,
 }: Props) {
   const is = currentData.income_statement;
   const rev = is.revenue;
   const opex = is.opex;
   const mins = useMinutesAgo(uploadedAt);
+
+  const ytd = computeYTDTotals(records, currentData.month);
 
   const totalIncome = rev._total.actual;
   const totalExpenses = opex._total.actual;
@@ -195,13 +220,14 @@ export function OverviewPacket({
       {/* KPI strip */}
       <div className="bg-white border border-gray-200 rounded-xl grid grid-cols-2 sm:grid-cols-5 divide-x divide-y sm:divide-y-0 divide-gray-100">
         <KpiTile label="Cash Balance" value={bsSummary ? fmt(bsSummary.cash_and_bank) : "—"} sub={bsSummary ? undefined : "no packet for this period"} tone="pos" />
-        <KpiTile label="Op. Net Income (PTD)" value={fmt(opNI)} sub={priorOpNI != null ? momLabel(opNI, priorOpNI) : undefined} tone={opNI < 0 ? "neg" : "neutral"} />
-        <KpiTile label="Total Income (PTD)" value={fmt(totalIncome)} tone="neutral" />
-        <KpiTile label="Total Expenses (PTD)" value={fmt(totalExpenses)} tone="neutral" />
+        <KpiTile label="Op. Net Income (PTD)" value={fmt(opNI)} sub={priorOpNI != null ? momLabel(opNI, priorOpNI) : undefined} ytd={ytd ? `YTD ${fmt(ytd.opNI, true)}` : undefined} tone={opNI < 0 ? "neg" : "neutral"} />
+        <KpiTile label="Total Income (PTD)" value={fmt(totalIncome)} ytd={ytd ? `YTD ${fmt(ytd.revenue, true)}` : undefined} tone="neutral" />
+        <KpiTile label="Total Expenses (PTD)" value={fmt(totalExpenses)} ytd={ytd ? `YTD ${fmt(ytd.opex, true)}` : undefined} tone="neutral" />
         <KpiTile
           label="Occupancy (PTD)"
           value={occupancy?.occupancy_pct != null ? `${occupancy.occupancy_pct}%` : "—"}
           sub={occDeltaVal != null ? `${occDeltaVal >= 0 ? "+" : "("}${Math.abs(occDeltaVal)}${occDeltaVal < 0 ? "%)" : "%"} MoM` : undefined}
+          ytd={occupancy?.raw.ytd_occupancy_pct != null ? `YTD ${occupancy.raw.ytd_occupancy_pct}%` : undefined}
           tone="brand"
         />
       </div>
@@ -426,13 +452,14 @@ function EmptyChart({ label }: { label: string }) {
   return <div className="h-[100px] flex items-center justify-center text-[11px] text-gray-400 text-center px-2">{label}</div>;
 }
 
-function KpiTile({ label, value, sub, tone }: { label: string; value: string; sub?: string; tone: "pos" | "neg" | "neutral" | "brand" }) {
+function KpiTile({ label, value, sub, ytd, tone }: { label: string; value: string; sub?: string; ytd?: string; tone: "pos" | "neg" | "neutral" | "brand" }) {
   const valueColor = tone === "neg" ? "text-red-600" : tone === "brand" ? "text-[#F15B27]" : tone === "pos" ? "text-emerald-700" : "text-gray-900";
   return (
     <div className="px-3 sm:px-4 py-3.5 text-center">
       <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wide">{label}</p>
       <p className={`text-lg sm:text-xl font-extrabold tabular-nums mt-1 ${valueColor}`}>{value}</p>
       {sub && <p className="text-[10.5px] text-gray-400 mt-0.5 tabular-nums">{sub}</p>}
+      {ytd && <p className="text-[10.5px] text-gray-400 tabular-nums">{ytd}</p>}
     </div>
   );
 }
