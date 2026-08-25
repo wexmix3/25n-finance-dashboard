@@ -334,9 +334,9 @@ export function OverviewPacket({
             </thead>
             <tbody>
               <BudgetRow label="Total Income" line={rev._total} prior={priorData?.income_statement.revenue._total} />
-              <BudgetRow label="Cost of Sales" line={is.cos._total} prior={priorData?.income_statement.cos._total} />
+              <BudgetRow label="Cost of Sales" line={is.cos._total} prior={priorData?.income_statement.cos._total} isExpense />
               <BudgetRow label="Gross Profit" line={is.gross_profit} prior={priorData?.income_statement.gross_profit} />
-              <BudgetRow label="Total Expenses" line={opex._total} prior={priorData?.income_statement.opex._total} />
+              <BudgetRow label="Total Expenses" line={opex._total} prior={priorData?.income_statement.opex._total} isExpense />
               <BudgetRow label="Operating Net Income" line={is.net_operating_income} prior={priorData?.income_statement.net_operating_income} bold last />
             </tbody>
           </table>
@@ -447,7 +447,18 @@ function Row({ label, value, pctVal, bold, last, positive }: { label: string; va
   );
 }
 
-function BudgetRow({ label, line, prior, bold, last }: { label: string; line: LineItem; prior?: LineItem; bold?: boolean; last?: boolean }) {
+// Variance/MoM columns are a favorability signal, not a raw-value sign check
+// -- for an expense line, coming in under budget (negative variance) is
+// favorable and should NOT be red. Christine flagged this exact reversal on
+// Cost of Sales / Total Expenses 2026-08-25 ("lower current-period costs
+// than the prior period/budget are positive/favorable, not negative").
+function varianceClass(n: number | undefined | null, isExpense: boolean): string {
+  if (n == null) return "text-gray-800";
+  const unfavorable = isExpense ? n > 0 : n < 0;
+  return unfavorable ? "text-red-600" : "text-gray-800";
+}
+
+function BudgetRow({ label, line, prior, bold, last, isExpense = false }: { label: string; line: LineItem; prior?: LineItem; bold?: boolean; last?: boolean; isExpense?: boolean }) {
   const varPct = line.budget !== 0 ? (line.variance / Math.abs(line.budget)) * 100 : null;
   const mom = prior ? line.actual - prior.actual : null;
   const momPct = prior && prior.actual !== 0 ? (mom! / Math.abs(prior.actual)) * 100 : null;
@@ -456,12 +467,12 @@ function BudgetRow({ label, line, prior, bold, last }: { label: string; line: Li
       <td className={`px-4 sm:px-5 py-2 ${bold ? "font-bold text-gray-900" : "text-gray-700"}`}>{label}</td>
       <td className={`text-right px-4 sm:px-5 py-2 tabular-nums ${bold ? "font-bold" : ""} ${cellClass(line.actual)}`}>{fmt(line.actual)}</td>
       <td className="text-right px-4 sm:px-5 py-2 tabular-nums text-gray-600">{fmt(line.budget)}</td>
-      <td className={`text-right px-4 sm:px-5 py-2 tabular-nums ${cellClass(line.variance)}`}>{fmt(line.variance)}</td>
-      <td className={`text-right px-4 sm:px-5 py-2 tabular-nums ${cellClass(varPct)}`}>{pctAcct(varPct)}</td>
+      <td className={`text-right px-4 sm:px-5 py-2 tabular-nums ${varianceClass(line.variance, isExpense)}`}>{fmt(line.variance)}</td>
+      <td className={`text-right px-4 sm:px-5 py-2 tabular-nums ${varianceClass(varPct, isExpense)}`}>{pctAcct(varPct)}</td>
       {prior && <>
         <td className="text-right px-4 sm:px-5 py-2 tabular-nums text-gray-600">{fmt(prior.actual)}</td>
-        <td className={`text-right px-4 sm:px-5 py-2 tabular-nums ${cellClass(mom)}`}>{fmt(mom)}</td>
-        <td className={`text-right px-4 sm:px-5 py-2 tabular-nums ${cellClass(momPct)}`}>{pctAcct(momPct)}</td>
+        <td className={`text-right px-4 sm:px-5 py-2 tabular-nums ${varianceClass(mom, isExpense)}`}>{fmt(mom)}</td>
+        <td className={`text-right px-4 sm:px-5 py-2 tabular-nums ${varianceClass(momPct, isExpense)}`}>{pctAcct(momPct)}</td>
       </>}
     </tr>
   );
