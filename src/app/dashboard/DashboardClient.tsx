@@ -151,20 +151,29 @@ function fmtExec(n: number): string {
 /** Portfolio-wide occupancy — simple average across whichever locations
  * have a current Kube occupancy record, so a location that hasn't reported
  * yet doesn't silently zero out the portfolio figure (same guard pattern as
- * computePortfolioSnapshot for financials). */
+ * computePortfolioSnapshot for financials).
+ *
+ * Reads through the shared `occupancyMetricValue("total")` helper -- same
+ * one the Total Space Occupancy table below uses -- so this hero-card
+ * average and that table's bottom-row average can never disagree again.
+ * Previously this read `occ?.occupancy_pct` directly and skipped the
+ * table's 0%-is-"no data" rule, which is exactly what Christine caught in
+ * her 2026-08-24 feedback ("shouldn't these two occupancy % equal each
+ * other?") -- confirmed live 2026-08-25: this card and the table disagreed
+ * only in months where a location (Uptown) posted a literal 0%. */
 function computePortfolioOccupancy(locationData: Record<Location, LocationData>, month: string | null) {
   let sum = 0, count = 0, priorSum = 0, priorCount = 0;
   for (const loc of LOCATIONS) {
     const occ = month
       ? locationData[loc].allOccupancy.find(o => o.month === month)?.data
       : locationData[loc].occupancy;
-    const pct = occ?.occupancy_pct;
+    const pct = occupancyMetricValue(occ, "total");
     if (pct != null) { sum += pct; count++; }
     const priorMonthStr = month ? getPriorMonthLabel(month) : null;
     const priorOcc = month
       ? locationData[loc].allOccupancy.find(o => o.month === priorMonthStr)?.data
       : locationData[loc].priorOccupancy;
-    const priorPct = priorOcc?.occupancy_pct;
+    const priorPct = occupancyMetricValue(priorOcc, "total");
     if (priorPct != null) { priorSum += priorPct; priorCount++; }
   }
   return {
@@ -179,14 +188,20 @@ function computePortfolioOccupancy(locationData: Record<Location, LocationData>,
  * 2026-08-19 "historical occupancies" ask — she said stick to 2026, add
  * 2025 later if that data becomes available). Feeds the Consolidated
  * Overview's occupancy trend chart, the same reusable component the
- * per-location Occupancy tab already uses. */
+ * per-location Occupancy tab already uses.
+ *
+ * Reads through `occupancyMetricValue("total")` (same as the hero card and
+ * the Total Space Occupancy table) so all three Consolidated occupancy
+ * views agree with each other. */
 function computePortfolioOccupancyTrend(locationData: Record<Location, LocationData>): { month: string; occupancy_pct: number | null }[] {
   const byMonth = new Map<string, { sum: number; count: number }>();
   for (const loc of LOCATIONS) {
     for (const { month, data } of locationData[loc].allOccupancy) {
-      if (!month.endsWith("2026") || data?.occupancy_pct == null) continue;
+      if (!month.endsWith("2026")) continue;
+      const pct = occupancyMetricValue(data, "total");
+      if (pct == null) continue;
       const cur = byMonth.get(month) ?? { sum: 0, count: 0 };
-      cur.sum += data.occupancy_pct;
+      cur.sum += pct;
       cur.count += 1;
       byMonth.set(month, cur);
     }

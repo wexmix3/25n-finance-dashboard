@@ -114,7 +114,9 @@ export function OverviewPacket({
   const barData = trend.slice(-7).map(t => ({ month: t.month.split(" ")[0], noi: t.noi }));
 
   // Revenue mix — group anything under 2% of income into "Other" so the
-  // donut stays legible instead of a ring of unreadable slivers.
+  // donut stays legible instead of a ring of unreadable slivers. Sorted
+  // highest $ to lowest (Christine's 2026-08-24 ask) before grouping, so
+  // "Other" (grouped small slices) still lands last regardless.
   const revenueLines: { label: string; value: number }[] = [
     { label: "Workspace Rental", value: rev.workspace_rental.actual },
     { label: "Meeting Space", value: rev.meeting_space.actual },
@@ -123,8 +125,23 @@ export function OverviewPacket({
     { label: "Member Amenities", value: rev.member_amenities.actual },
     { label: "Registration & Access", value: rev.registration_access.actual },
     { label: "Miscellaneous", value: rev.miscellaneous.actual },
-  ];
+  ].sort((a, b) => b.value - a.value);
   const revenueMixChart = groupSmallSlices(revenueLines, totalIncome);
+
+  // Operating expense mix — same sort, highest $ to lowest.
+  const opexLines: { label: string; value: number }[] = [
+    { label: "Payroll", value: opex.payroll.actual },
+    { label: "Facilities", value: opex.facilities.actual },
+    { label: "Insurance", value: opex.insurance.actual },
+    { label: "Admin & Legal", value: opex.admin_legal.actual },
+    { label: "Marketing", value: opex.marketing.actual },
+    { label: "Meals & Entertainment", value: opex.meals_entertainment.actual },
+    { label: "Office Supplies", value: opex.office_supplies.actual },
+    { label: "Technology", value: opex.technology.actual },
+    { label: "Travel", value: opex.travel.actual },
+    { label: "Utilities", value: opex.utilities.actual },
+    { label: "Other", value: opex.other.actual },
+  ].sort((a, b) => b.value - a.value);
 
   // Occupancy mix — same five core space types the Occupancy tab already
   // scores into occupancy_pct (Day Office / Meeting Rooms excluded there too).
@@ -333,20 +350,8 @@ export function OverviewPacket({
           <table className="w-full text-[13px]">
             <thead><tr className="border-b border-gray-100"><th className="text-left font-semibold text-gray-400 text-[10.5px] uppercase px-4 sm:px-5 py-2">&nbsp;</th><th className="text-right font-semibold text-gray-400 text-[10.5px] uppercase px-4 sm:px-5 py-2">{currentData.month.split(" ")[0]} Actual</th><th className="text-right font-semibold text-gray-400 text-[10.5px] uppercase px-4 sm:px-5 py-2">% of Expenses</th></tr></thead>
             <tbody>
-              {[
-                { label: "Payroll", v: opex.payroll.actual },
-                { label: "Facilities", v: opex.facilities.actual },
-                { label: "Insurance", v: opex.insurance.actual },
-                { label: "Admin & Legal", v: opex.admin_legal.actual },
-                { label: "Marketing", v: opex.marketing.actual },
-                { label: "Meals & Entertainment", v: opex.meals_entertainment.actual },
-                { label: "Office Supplies", v: opex.office_supplies.actual },
-                { label: "Technology", v: opex.technology.actual },
-                { label: "Travel", v: opex.travel.actual },
-                { label: "Utilities", v: opex.utilities.actual },
-                { label: "Other", v: opex.other.actual },
-              ].map(l => (
-                <Row key={l.label} label={l.label} value={fmt(l.v)} pctVal={totalExpenses !== 0 ? pct((l.v / totalExpenses) * 100) : "—"} />
+              {opexLines.map(l => (
+                <Row key={l.label} label={l.label} value={fmt(l.value)} pctVal={totalExpenses !== 0 ? pct((l.value / totalExpenses) * 100) : "—"} />
               ))}
               <Row label="Total Operating Expenses" value={fmt(totalExpenses)} pctVal="100.0%" bold last />
             </tbody>
