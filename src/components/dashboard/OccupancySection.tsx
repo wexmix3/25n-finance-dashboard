@@ -2,7 +2,8 @@
 
 import type { OccupancyData } from "@/types/dashboard";
 import { formatCurrency } from "@/lib/formatCurrency";
-import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
+import { BarChart, Bar, Cell, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
+import { occupancyMetricValue, occupancyMetricUnits } from "@/lib/occupancy";
 
 interface Props {
   current: OccupancyData | null;
@@ -24,12 +25,6 @@ export function occupancyDeltaLabel(curr: number | undefined, prev: number | und
   return d > 0 ? `+${d}% MoM` : `(${Math.abs(d)}%) MoM`;
 }
 
-function deltaInt(curr: number | undefined, prev: number | undefined): string | null {
-  if (curr == null || prev == null) return null;
-  const d = curr - prev;
-  return `${d > 0 ? "+" : ""}${d}`;
-}
-
 function fmt$(n: number | undefined): string {
   if (n === undefined) return "—";
   return formatCurrency(n, { zeroDash: false });
@@ -46,14 +41,8 @@ export function OccupancyTrendChart({ history, title = "6-Month Occupancy Trend"
     <div className="px-4 pb-4 pt-3 border-t border-gray-100">
       <p className="text-xs font-semibold text-gray-500 mb-2">{title}</p>
       <ResponsiveContainer width="100%" height={160} debounce={200}>
-        <AreaChart data={chartData} margin={{ top: 4, right: 12, left: 0, bottom: 0 }}>
-          <defs>
-            <linearGradient id="fillOccupancy" x1="0" y1="0" x2="0" y2="1">
-              <stop offset="5%" stopColor="#F15B27" stopOpacity={0.08} />
-              <stop offset="95%" stopColor="#F15B27" stopOpacity={0} />
-            </linearGradient>
-          </defs>
-          <CartesianGrid strokeDasharray="3 3" stroke="#f4f4f4" />
+        <BarChart data={chartData} margin={{ top: 4, right: 12, left: 0, bottom: 0 }}>
+          <CartesianGrid strokeDasharray="3 3" stroke="#f4f4f4" vertical={false} />
           <XAxis
             dataKey="month"
             tick={{ fontSize: 10, fill: "#9ca3af" }}
@@ -72,33 +61,14 @@ export function OccupancyTrendChart({ history, title = "6-Month Occupancy Trend"
             formatter={(value) => [`${value}%`, "Occupancy"]}
             labelStyle={{ fontSize: 11, fontWeight: 600 }}
             contentStyle={{ fontSize: 11, border: "1px solid #e5e7eb", borderRadius: 8 }}
+            cursor={{ fill: "#F15B27", fillOpacity: 0.06 }}
           />
-          <Area
-            type="monotone"
-            dataKey="occupancy_pct"
-            stroke="#F15B27"
-            strokeWidth={2}
-            fill="url(#fillOccupancy)"
-            connectNulls
-            dot={(props: { cx?: number; cy?: number; index?: number }) => {
-              const { cx, cy, index } = props;
-              if (cx == null || cy == null || index == null) return <g />;
-              const isCurrent = index === lastIndex;
-              return (
-                <circle
-                  cx={cx}
-                  cy={cy}
-                  r={isCurrent ? 4.5 : 2.5}
-                  fill={isCurrent ? "#F15B27" : "#d1d5db"}
-                  stroke={isCurrent ? "#ffffff" : "none"}
-                  strokeWidth={isCurrent ? 1.5 : 0}
-                />
-              );
-            }}
-            activeDot={{ r: 5 }}
-            name="Occupancy"
-          />
-        </AreaChart>
+          <Bar dataKey="occupancy_pct" name="Occupancy" radius={[3, 3, 0, 0]}>
+            {chartData.map((d, i) => (
+              <Cell key={d.month} fill={i === lastIndex ? "#F15B27" : "#F9C4AB"} />
+            ))}
+          </Bar>
+        </BarChart>
       </ResponsiveContainer>
     </div>
   );
@@ -128,7 +98,14 @@ export function OccupancySection({ current, prior, expectedMonth, history }: Pro
   }
 
   const occDelta = occupancyDeltaLabel(current.occupancy_pct ?? undefined, prior?.occupancy_pct ?? undefined);
-  const memberDelta = deltaInt(current.total_members ?? undefined, prior?.total_members ?? undefined);
+
+  const privateOfficePct = occupancyMetricValue(current, "private_office");
+  const privateOfficeDelta = occupancyDeltaLabel(privateOfficePct ?? undefined, occupancyMetricValue(prior, "private_office") ?? undefined);
+  const privateOfficeUnits = occupancyMetricUnits(current, "private_office");
+
+  const dedicatedDeskPct = occupancyMetricValue(current, "dedicated_desk");
+  const dedicatedDeskDelta = occupancyDeltaLabel(dedicatedDeskPct ?? undefined, occupancyMetricValue(prior, "dedicated_desk") ?? undefined);
+  const dedicatedDeskUnits = occupancyMetricUnits(current, "dedicated_desk");
 
   // Only the five space types that factor into occupancy_pct (Christine
   // confirmed 2026-08-17, see parse_kube_api_occupancy.py CORE_TYPE_PREFIXES)
@@ -160,31 +137,37 @@ export function OccupancySection({ current, prior, expectedMonth, history }: Pro
           )}
         </div>
 
-        {/* Avg daily occupied */}
+        {/* Private Offices Occupied */}
         <div>
-          <p className="text-xs text-gray-400 mb-0.5">Occupied</p>
+          <p className="text-xs text-gray-400 mb-0.5">Private Offices Occupied</p>
           <p className="text-2xl font-semibold text-gray-900">
-            {current.total_members != null ? current.total_members.toLocaleString() : "—"}
+            {privateOfficePct != null ? `${privateOfficePct}%` : "—"}
           </p>
-          {memberDelta && (
-            <p className={`text-xs mt-0.5 ${memberDelta.startsWith("+") ? "text-emerald-600" : "text-red-600"}`}>
-              {memberDelta} MoM
+          {privateOfficeUnits && (
+            <p className="text-xs text-gray-400 mt-0.5">{privateOfficeUnits.occupied} of {privateOfficeUnits.total}</p>
+          )}
+          {privateOfficeDelta && (
+            <p className={`text-xs mt-0.5 ${privateOfficeDelta.startsWith("(") ? "text-red-600" : privateOfficeDelta.startsWith("+") ? "text-emerald-600" : "text-gray-400"}`}>
+              {privateOfficeDelta}
             </p>
           )}
         </div>
 
-        {/* Booked desks */}
-        {current.booked_desks != null && (
-          <div>
-            <p className="text-xs text-gray-400 mb-0.5">Units Booked</p>
-            <p className="text-2xl font-semibold text-gray-900">
-              {current.booked_desks.toLocaleString()}
+        {/* Dedicated Desks Occupied */}
+        <div>
+          <p className="text-xs text-gray-400 mb-0.5">Dedicated Desks Occupied</p>
+          <p className="text-2xl font-semibold text-gray-900">
+            {dedicatedDeskPct != null ? `${dedicatedDeskPct}%` : "—"}
+          </p>
+          {dedicatedDeskUnits && (
+            <p className="text-xs text-gray-400 mt-0.5">{dedicatedDeskUnits.occupied} of {dedicatedDeskUnits.total}</p>
+          )}
+          {dedicatedDeskDelta && (
+            <p className={`text-xs mt-0.5 ${dedicatedDeskDelta.startsWith("(") ? "text-red-600" : dedicatedDeskDelta.startsWith("+") ? "text-emerald-600" : "text-gray-400"}`}>
+              {dedicatedDeskDelta}
             </p>
-            {current.available_desks != null && (
-              <p className="text-xs text-gray-400 mt-0.5">of {current.available_desks}</p>
-            )}
-          </div>
-        )}
+          )}
+        </div>
 
         {/* Contract revenue */}
         <div>

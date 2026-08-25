@@ -231,7 +231,7 @@ export function OverviewPacket({
                   <Row label="Working Capital" value={fmt(workingCapital)} />
                   <Row label="Cash as % of Current Liabilities" value={bsSummary.current_liabilities !== 0 ? pct((bsSummary.cash_and_bank / bsSummary.current_liabilities) * 100) : "—"} />
                   <Row label="Operating Margin (PTD)" value={Math.abs(totalIncome) >= MARGIN_REVENUE_FLOOR ? pctAcct((opNI / totalIncome) * 100) : "N/A · low revenue"} />
-                  <Row label="Months of Cash at Current Burn" value={totalExpenses > 0 ? (bsSummary.cash_and_bank / totalExpenses).toFixed(1) : "—"} />
+                  <Row label="Months of Cash at Current Burn" value={totalExpenses > 0 ? Math.round(bsSummary.cash_and_bank / totalExpenses).toString() : "—"} />
                   <Row label="Balance Sheet Check (A = L + C)" value={Math.abs(bsSummary.balance_check) < 1 ? "OK" : fmt(bsSummary.balance_check)} bold last positive={Math.abs(bsSummary.balance_check) < 1} />
                 </tbody>
               </table>

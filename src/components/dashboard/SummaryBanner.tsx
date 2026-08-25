@@ -65,9 +65,14 @@ export function SummaryBanner({ healthStatuses, currentMonth, pacingPct }: Props
   };
 
   return (
-    <div className={`flex items-center gap-3 bg-white rounded-lg border border-gray-200 border-l-4 px-4 py-2.5 ${leftBorder[tone]}`}>
-      <span className={`w-2 h-2 rounded-full flex-shrink-0 ${dotColor[tone]}`} />
-      <p className="text-sm text-gray-700 font-medium">{text}</p>
+    <div className={`flex items-start gap-3 bg-white rounded-lg border border-gray-200 border-l-4 px-4 py-2.5 ${leftBorder[tone]}`}>
+      <span className={`w-2 h-2 rounded-full flex-shrink-0 mt-1.5 ${dotColor[tone]}`} />
+      <div>
+        <p className="text-sm text-gray-700 font-medium">{text}</p>
+        <p className="text-xs text-gray-400 mt-0.5">
+          Based on Net Income vs. prorated budget-to-date, per location: on pace = within 10% of budget · at risk = 10–25% behind · off track = more than 25% behind. Matches the health dot on each location&apos;s tab.
+        </p>
+      </div>
     </div>
   );
 }

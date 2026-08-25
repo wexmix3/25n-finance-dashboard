@@ -13,6 +13,7 @@ import { TrendChart } from "@/components/dashboard/TrendChart";
 import { OverviewPacket } from "@/components/dashboard/OverviewPacket";
 import { OccupancySection, occupancyDeltaLabel, OccupancyTrendChart } from "@/components/dashboard/OccupancySection";
 import { OccupancyHistoryTable } from "@/components/dashboard/OccupancyHistoryTable";
+import { occupancyMetricValue, type OccupancyMetric } from "@/lib/occupancy";
 import { LocationSummaryTable } from "@/components/dashboard/LocationSummaryTable";
 import { DataDictionary } from "@/components/dashboard/DataDictionary";
 import { GLCheckTab } from "@/components/dashboard/GLCheckTab";
@@ -193,64 +194,6 @@ function computePortfolioOccupancyTrend(locationData: Record<Location, LocationD
   return [...byMonth.entries()]
     .sort((a, b) => monthSortKeyLocal(a[0]) - monthSortKeyLocal(b[0]))
     .map(([month, { sum, count }]) => ({ month, occupancy_pct: count > 0 ? sum / count : null }));
-}
-
-/** Per-location occupancy history, one row per month — feeds
- * OccupancyHistoryTable, the per-location breakdown Christine asked for
- * ("the table, not the chart") alongside the existing blended trend chart.
- * Same 2026-only scope and same allOccupancy source as
- * computePortfolioOccupancyTrend above, so the two views can't disagree. */
-export type OccupancyMetric = "total" | "private_office" | "dedicated_desk";
-
-// Space-type prefixes matching the CORE_TYPE_PREFIXES convention already
-// used in parse_kube_api_occupancy.py / push_manual_occupancy.py -- handles
-// per-sub-location suffixed names too (e.g. Schaumburg's Kube data reports
-// "Private Office - Huddle Up" and "Private Office - Amara Club" as
-// separate entries, both need to roll into one Private Office figure).
-const SPACE_TYPE_PREFIX: Record<Exclude<OccupancyMetric, "total">, string> = {
-  private_office: "Private Office",
-  dedicated_desk: "Dedicated Desk",
-};
-
-/** Reads one occupancy metric off a record, in priority order: (1) Total
- * Space's own field, (2) an explicit backfilled percentage (the only option
- * for Jan-Jul, which came from Tracey's file as a rate with no per-unit
- * counts), (3) aggregated from space_breakdown's real unit counts (Kube-
- * sourced live months only -- Aug 2026 onward).
- *
- * A literal 0% is canonicalized to null (same as "never reported"), not
- * displayed as a real zero -- confirmed with Max 2026-08-25 using Uptown as
- * the concrete case: it's pre-opening, so a bare "0%" reads as "empty and
- * failing" when the truth is "hasn't opened yet, nothing to measure." Same
- * convention already used for hardcoded financial-statement zeros
- * (rendered as "-", not "0"). Applies to every location uniformly, not just
- * Uptown -- no other active location has posted a real 0% in this dataset,
- * so this can't currently hide a genuine occupancy-collapse signal, but
- * revisit this rule if one ever does. */
-function occupancyMetricValue(data: OccupancyData | null | undefined, metric: OccupancyMetric): number | null {
-  if (!data) return null;
-
-  let value: number | null;
-  if (metric === "total") {
-    value = data.occupancy_pct ?? null;
-  } else {
-    const explicit = metric === "private_office" ? data.raw.private_office_pct : data.raw.dedicated_desk_pct;
-    if (explicit != null) {
-      value = explicit;
-    } else {
-      const prefix = SPACE_TYPE_PREFIX[metric];
-      const matching = (data.raw.space_breakdown ?? []).filter(sb => sb.space_type.startsWith(prefix));
-      if (matching.length === 0) {
-        value = null;
-      } else {
-        const total = matching.reduce((sum, sb) => sum + sb.total_units, 0);
-        const occupied = matching.reduce((sum, sb) => sum + sb.occupied_units, 0);
-        value = total > 0 ? Math.round((occupied / total) * 1000) / 10 : null;
-      }
-    }
-  }
-
-  return value === 0 ? null : value;
 }
 
 /** Per-location occupancy history, one row per month, for a single metric
