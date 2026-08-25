@@ -507,9 +507,13 @@ export function DashboardClient({ locationData, packetData, userEmail, role, glI
             ? `${onPace} of ${scored} locations on pace — ${atRisk.join(", ")} at risk.`
             : `All ${scored} locations on pace vs budget.`;
 
+          const paceMethodNote = scored > 0
+            ? "Based on Net Income vs. prorated budget-to-date, per location: on pace = within 10% of budget · at risk = 10–25% behind · off track = more than 25% behind. Matches the health dot on each location's tab."
+            : undefined;
+
           return (
             <div className="space-y-5">
-              <InsightPanel insight={headline} detail={`Portfolio · ${consolidatedDisplayMonth}`} />
+              <InsightPanel insight={headline} detail={`Portfolio · ${consolidatedDisplayMonth}`} methodNote={paceMethodNote} />
 
               {/* Hero pair: Net Income + Occupancy, boxed and filling the full row width */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">

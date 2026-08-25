@@ -5,6 +5,10 @@ interface Props {
   insight: string;
   /** Muted sub-detail line — insights[1] when the model produced a second observation. */
   detail?: string;
+  /** Smallest, lightest caption — explains the mechanism behind `insight`
+   * (e.g. what "on pace"/"off track" is actually measuring) so the headline
+   * never reads as an unexplained verdict. */
+  methodNote?: string;
   /** Action/link row below the insight, e.g. "View full P&L". */
   actionLabel?: string;
   onAction?: () => void;
@@ -16,7 +20,7 @@ interface Props {
  * Overview's hero. Small icon, "Today's Key Insight" label, bold takeaway,
  * optional muted sub-detail, and an action link row.
  */
-export function InsightPanel({ insight, detail, actionLabel, onAction }: Props) {
+export function InsightPanel({ insight, detail, methodNote, actionLabel, onAction }: Props) {
   return (
     <div className="rounded-lg border border-gray-200 bg-white p-4">
       <div className="flex items-center gap-2 mb-2">
@@ -29,6 +33,7 @@ export function InsightPanel({ insight, detail, actionLabel, onAction }: Props) 
       </div>
       <p className="text-base font-semibold text-gray-900 leading-snug">{insight}</p>
       {detail && <p className="text-sm text-gray-500 mt-1 leading-relaxed">{detail}</p>}
+      {methodNote && <p className="text-xs text-gray-400 mt-1.5 leading-relaxed">{methodNote}</p>}
       {actionLabel && (
         <button
           onClick={onAction}
