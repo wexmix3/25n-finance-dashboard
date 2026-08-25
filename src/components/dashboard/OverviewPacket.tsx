@@ -84,6 +84,38 @@ export function computeOccupancyMix(raw: {
   return mix;
 }
 
+// History-table-only variant of computeOccupancyMix -- rolls multi-room
+// entries (Schaumburg's "Private Office - Huddle Up" / "- Amara Club") up
+// to their base type so a month with room-level detail lines up with a
+// locked historical month that only has the coarser dedicated_desk_pct/
+// private_office_pct rate. The current-period donut keeps full room detail
+// via computeOccupancyMix() above -- this rollup is only for the
+// month-over-month history table, where mismatched labels made two
+// non-overlapping columns look like missing data (2026-08-25).
+export function computeOccupancyMixRollup(raw: {
+  space_breakdown?: { space_type: string; occupancy_rate: number; total_units?: number; occupied_units?: number }[];
+  dedicated_desk_pct?: number | null;
+  private_office_pct?: number | null;
+} | undefined): { label: string; value: number }[] {
+  const spaceBreakdown = raw?.space_breakdown;
+  if (spaceBreakdown && spaceBreakdown.length > 0) {
+    const groups = new Map<string, { occupied: number; total: number }>();
+    for (const sb of spaceBreakdown) {
+      const base = CORE_TYPE_PREFIXES.find(p => sb.space_type.startsWith(p));
+      if (!base) continue;
+      const g = groups.get(base) ?? { occupied: 0, total: 0 };
+      g.occupied += sb.occupied_units ?? 0;
+      g.total += sb.total_units ?? 0;
+      groups.set(base, g);
+    }
+    return Array.from(groups.entries()).map(([label, g]) => ({
+      label,
+      value: g.total > 0 ? Math.round((g.occupied / g.total) * 1000) / 10 : 0,
+    }));
+  }
+  return computeOccupancyMix(raw);
+}
+
 function fmt(n: number | undefined | null, compact = false): string {
   if (n == null) return "—";
   return formatCurrency(n, { compact, zeroDash: false });
