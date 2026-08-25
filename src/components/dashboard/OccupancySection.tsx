@@ -121,6 +121,9 @@ export function OccupancySection({ current, prior, expectedMonth, history }: Pro
       <div className="px-4 pt-4 pb-3 border-b border-gray-100">
         <h3 className="text-sm font-semibold text-gray-900">Occupancy</h3>
         <p className="text-xs text-gray-400 mt-0.5">{current.month} — from Kube</p>
+        <p className="text-xs text-gray-400 mt-1">
+          Occupancy % = Dedicated Desk, Private Office, Full Floor Office, Office Suite &amp; Team Office only — Day Office and Meeting Rooms aren&apos;t counted toward it.
+        </p>
       </div>
 
       <div className="p-4 grid grid-cols-2 sm:grid-cols-4 gap-4">

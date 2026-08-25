@@ -261,7 +261,13 @@ export function OverviewPacket({
         </SectionShell>
       </div>
 
-      {/* 2. Profitability & Occupancy Trend */}
+      {/* 2. Profitability & Occupancy Trend — every month in `trend` gets a
+          column (not sliced) so the section title's claimed range always
+          matches what's actually shown. Previously sliced to the last 7,
+          which silently dropped Jan off the left edge once 8 months of 2026
+          data existed while the title still said "Jan 2026 – Aug 2026" —
+          exactly what Christine flagged as "missing January." SectionShell
+          already scrolls horizontally for wide tables. */}
       <div>
         <SectionBand n={2} title={`Profitability & Occupancy Trend (${trend.length >= 2 ? `${trend[0].month} – ${trend[trend.length - 1].month}` : currentData.month})`} />
         <SectionShell>
@@ -270,21 +276,21 @@ export function OverviewPacket({
               <thead>
                 <tr className="border-b border-gray-100">
                   <th className="text-left font-semibold text-gray-400 text-[10.5px] uppercase px-4 sm:px-5 py-2">&nbsp;</th>
-                  {trend.slice(-7).map(t => <th key={t.month} className="text-right font-semibold text-gray-400 text-[10.5px] uppercase px-4 sm:px-5 py-2 whitespace-nowrap">{t.month.split(" ")[0]}</th>)}
+                  {trend.map(t => <th key={t.month} className="text-right font-semibold text-gray-400 text-[10.5px] uppercase px-4 sm:px-5 py-2 whitespace-nowrap">{t.month.split(" ")[0]}</th>)}
                 </tr>
               </thead>
               <tbody>
                 <tr className="border-b border-gray-50">
                   <td className="px-4 sm:px-5 py-2 text-gray-700">Total Income</td>
-                  {trend.slice(-7).map(t => <td key={t.month} className="text-right px-4 sm:px-5 py-2 tabular-nums text-gray-800">{fmt(t.revenue)}</td>)}
+                  {trend.map(t => <td key={t.month} className="text-right px-4 sm:px-5 py-2 tabular-nums text-gray-800">{fmt(t.revenue)}</td>)}
                 </tr>
                 <tr className="border-t border-gray-200">
                   <td className="px-4 sm:px-5 py-2 font-bold text-gray-900">Operating Net Income</td>
-                  {trend.slice(-7).map(t => <td key={t.month} className={`text-right px-4 sm:px-5 py-2 tabular-nums font-bold ${cellClass(t.noi)}`}>{fmt(t.noi)}</td>)}
+                  {trend.map(t => <td key={t.month} className={`text-right px-4 sm:px-5 py-2 tabular-nums font-bold ${cellClass(t.noi)}`}>{fmt(t.noi)}</td>)}
                 </tr>
                 <tr>
                   <td className="px-4 sm:px-5 py-2 text-[#F15B27] font-semibold">Occupancy %</td>
-                  {trend.slice(-7).map(t => {
+                  {trend.map(t => {
                     const o = occupancyTrend.find(x => x.month === t.month)?.occupancy_pct ?? null;
                     return <td key={t.month} className="text-right px-4 sm:px-5 py-2 tabular-nums text-gray-800">{o != null ? `${Math.round(o)}%` : "—"}</td>;
                   })}
