@@ -10,7 +10,7 @@ import { PeriodPills } from "@/components/dashboard/PeriodPills";
 import { PeriodBanner } from "@/components/dashboard/PeriodBanner";
 import { InsightPanel } from "@/components/dashboard/InsightPanel";
 import { TrendChart } from "@/components/dashboard/TrendChart";
-import { OverviewPacket } from "@/components/dashboard/OverviewPacket";
+import { OverviewPacket, computeOccupancyMix } from "@/components/dashboard/OverviewPacket";
 import { OccupancySection, occupancyDeltaLabel, OccupancyTrendChart } from "@/components/dashboard/OccupancySection";
 import { OccupancyHistoryTable } from "@/components/dashboard/OccupancyHistoryTable";
 import { occupancyMetricValue, type OccupancyMetric } from "@/lib/occupancy";
@@ -740,6 +740,7 @@ export function DashboardClient({ locationData, packetData, userEmail, role, glI
           const heroInsight = currentData.insights?.[0];
           const heroDetail = currentData.insights?.[1];
           const occupancyTrend = locData.allOccupancy.map(o => ({ month: o.month, occupancy_pct: o.data?.occupancy_pct ?? null }));
+          const occupancyMixTrend = locData.allOccupancy.map(o => ({ month: o.month, mix: computeOccupancyMix(o.data?.raw.space_breakdown) }));
           return (
             <div className="space-y-5">
               <InsightPanel
@@ -773,6 +774,7 @@ export function DashboardClient({ locationData, packetData, userEmail, role, glI
                 priorOccupancy={priorOccupancy}
                 trend={periodTrend}
                 occupancyTrend={occupancyTrend}
+                occupancyMixTrend={occupancyMixTrend}
                 records={locData.allRecords}
                 packet={packetData[activeLocation]?.find(p => p.month === currentData.month) ?? null}
                 locked={current?.locked ?? false}

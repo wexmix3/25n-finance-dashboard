@@ -23,6 +23,10 @@ interface Props {
   trend: TrendPoint[];
   /** Same month keys as `trend`, occupancy_pct only — merged in by month below. */
   occupancyTrend: { month: string; occupancy_pct: number | null }[];
+  /** Space-type occupancy mix (Dedicated Desk / Private Office / etc.) for
+   * every month on file, not just the currently-viewed one — Christine's
+   * "Missing the Occupancy mix for all prior periods" request, 2026-08-25. */
+  occupancyMixTrend: { month: string; mix: { label: string; value: number }[] }[];
   /** Latest generated packet for this location — Balance Sheet section only
    * renders when its month matches the period being viewed, since packets
    * aren't generated per historical period the way financials are. */
@@ -52,6 +56,17 @@ function computeYTDTotals(records: MonthlyRecord[], currentMonth: string): { rev
     }),
     { revenue: 0, opex: 0, opNI: 0 }
   );
+}
+
+// Same five core space types the Occupancy tab already scores into
+// occupancy_pct (Day Office / Meeting Rooms excluded there too). Exported so
+// the Consolidated call site can build the same mix for every historical
+// month, not just the one currently viewed.
+const CORE_TYPE_PREFIXES = ["Dedicated Desk", "Private Office", "Full Floor Office", "Office Suite", "Team Office"];
+export function computeOccupancyMix(spaceBreakdown: { space_type: string; occupancy_rate: number }[] | undefined): { label: string; value: number }[] {
+  return (spaceBreakdown ?? [])
+    .filter(sb => CORE_TYPE_PREFIXES.some(p => sb.space_type.startsWith(p)))
+    .map(sb => ({ label: sb.space_type, value: Math.round(sb.occupancy_rate * 1000) / 10 }));
 }
 
 function fmt(n: number | undefined | null, compact = false): string {
@@ -114,7 +129,7 @@ function SectionShell({ children }: { children: React.ReactNode }) {
 }
 
 export function OverviewPacket({
-  location, currentData, priorData, occupancy, priorOccupancy, trend, occupancyTrend, packet, locked, uploadedAt, pacingPct, records,
+  location, currentData, priorData, occupancy, priorOccupancy, trend, occupancyTrend, occupancyMixTrend, packet, locked, uploadedAt, pacingPct, records,
 }: Props) {
   const is = currentData.income_statement;
   const rev = is.revenue;
@@ -180,11 +195,7 @@ export function OverviewPacket({
 
   // Occupancy mix — same five core space types the Occupancy tab already
   // scores into occupancy_pct (Day Office / Meeting Rooms excluded there too).
-  const CORE_TYPE_PREFIXES = ["Dedicated Desk", "Private Office", "Full Floor Office", "Office Suite", "Team Office"];
-  const spaceBreakdown = (occupancy?.raw.space_breakdown ?? []).filter(sb =>
-    CORE_TYPE_PREFIXES.some(p => sb.space_type.startsWith(p))
-  );
-  const occMixChart = spaceBreakdown.map(sb => ({ label: sb.space_type, value: Math.round(sb.occupancy_rate * 1000) / 10 }));
+  const occMixChart = computeOccupancyMix(occupancy?.raw.space_breakdown);
 
   const occDeltaVal = occupancy?.occupancy_pct != null && priorOccupancy?.occupancy_pct != null
     ? Math.round(occupancy.occupancy_pct - priorOccupancy.occupancy_pct)
@@ -259,6 +270,8 @@ export function OverviewPacket({
           {occMixChart.length > 0 ? <MixDonut data={occMixChart} suffix="%" /> : <EmptyChart label="No occupancy breakdown yet" />}
         </div>
       </div>
+
+      <OccupancyMixHistory trend={occupancyMixTrend} />
 
       {/* 1. Liquidity & Solvency */}
       <div>
@@ -404,6 +417,51 @@ export function OverviewPacket({
       <p className="text-[11px] italic text-gray-400 px-1">
         Sections ordered by investor priority: liquidity and solvency first, then profitability and occupancy trajectory, budget performance, revenue quality, and cost structure. Figures pull live from the same GL and Kube data feeding GL Check and the Occupancy tab — nothing here is a separate copy.
       </p>
+    </div>
+  );
+}
+
+/** Compact space-type-by-month table below the current-period donut --
+ * shows every month that has mix data on file, not just the one selected. */
+function OccupancyMixHistory({ trend }: { trend: { month: string; mix: { label: string; value: number }[] }[] }) {
+  const populated = trend.filter(t => t.mix.length > 0);
+  if (populated.length < 2) return null;
+
+  const labels = Array.from(new Set(populated.flatMap(t => t.mix.map(m => m.label))));
+  const lastMonth = populated[populated.length - 1].month;
+
+  return (
+    <div className="bg-white border border-gray-200 rounded-xl p-4">
+      <p className="text-xs font-bold text-gray-700 mb-3">Occupancy Mix by Space Type — History</p>
+      <div className="overflow-x-auto">
+        <table className="w-full text-[12px] min-w-[420px]">
+          <thead>
+            <tr className="border-b border-gray-100">
+              <th className="text-left font-semibold text-gray-400 text-[10.5px] uppercase px-2 py-1.5">Space Type</th>
+              {populated.map(t => (
+                <th key={t.month} className={`text-right font-semibold text-[10.5px] uppercase px-2 py-1.5 ${t.month === lastMonth ? "text-[#F15B27]" : "text-gray-400"}`}>
+                  {t.month.split(" ")[0]}
+                </th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {labels.map(label => (
+              <tr key={label} className="border-b border-gray-50 last:border-0">
+                <td className="px-2 py-1.5 text-gray-700">{label}</td>
+                {populated.map(t => {
+                  const v = t.mix.find(m => m.label === label)?.value;
+                  return (
+                    <td key={t.month} className={`text-right tabular-nums px-2 py-1.5 ${t.month === lastMonth ? "font-semibold text-gray-900" : "text-gray-500"}`}>
+                      {v != null ? `${v}%` : "—"}
+                    </td>
+                  );
+                })}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
     </div>
   );
 }
