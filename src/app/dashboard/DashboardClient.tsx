@@ -740,7 +740,7 @@ export function DashboardClient({ locationData, packetData, userEmail, role, glI
           const heroInsight = currentData.insights?.[0];
           const heroDetail = currentData.insights?.[1];
           const occupancyTrend = locData.allOccupancy.map(o => ({ month: o.month, occupancy_pct: o.data?.occupancy_pct ?? null }));
-          const occupancyMixTrend = locData.allOccupancy.map(o => ({ month: o.month, mix: computeOccupancyMix(o.data?.raw.space_breakdown) }));
+          const occupancyMixTrend = locData.allOccupancy.map(o => ({ month: o.month, mix: computeOccupancyMix(o.data?.raw) }));
           return (
             <div className="space-y-5">
               <InsightPanel

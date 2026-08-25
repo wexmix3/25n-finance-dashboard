@@ -63,10 +63,25 @@ function computeYTDTotals(records: MonthlyRecord[], currentMonth: string): { rev
 // the Consolidated call site can build the same mix for every historical
 // month, not just the one currently viewed.
 const CORE_TYPE_PREFIXES = ["Dedicated Desk", "Private Office", "Full Floor Office", "Office Suite", "Team Office"];
-export function computeOccupancyMix(spaceBreakdown: { space_type: string; occupancy_rate: number }[] | undefined): { label: string; value: number }[] {
-  return (spaceBreakdown ?? [])
-    .filter(sb => CORE_TYPE_PREFIXES.some(p => sb.space_type.startsWith(p)))
-    .map(sb => ({ label: sb.space_type, value: Math.round(sb.occupancy_rate * 1000) / 10 }));
+export function computeOccupancyMix(raw: {
+  space_breakdown?: { space_type: string; occupancy_rate: number }[];
+  dedicated_desk_pct?: number | null;
+  private_office_pct?: number | null;
+} | undefined): { label: string; value: number }[] {
+  const spaceBreakdown = raw?.space_breakdown;
+  if (spaceBreakdown && spaceBreakdown.length > 0) {
+    return spaceBreakdown
+      .filter(sb => CORE_TYPE_PREFIXES.some(p => sb.space_type.startsWith(p)))
+      .map(sb => ({ label: sb.space_type, value: Math.round(sb.occupancy_rate * 1000) / 10 }));
+  }
+  // No unit-level breakdown for this month (locked historical rows sourced
+  // from Christine's "Consolidated Dashboard 8.1.2026.xlsx" via Tracey --
+  // rate-only, no unit counts). Fall back to the rate fields rather than
+  // showing blank; still Christine-verified, just a coarser shape.
+  const mix: { label: string; value: number }[] = [];
+  if (raw?.dedicated_desk_pct != null) mix.push({ label: "Dedicated Desk", value: raw.dedicated_desk_pct });
+  if (raw?.private_office_pct != null) mix.push({ label: "Private Office", value: raw.private_office_pct });
+  return mix;
 }
 
 function fmt(n: number | undefined | null, compact = false): string {
@@ -195,7 +210,7 @@ export function OverviewPacket({
 
   // Occupancy mix — same five core space types the Occupancy tab already
   // scores into occupancy_pct (Day Office / Meeting Rooms excluded there too).
-  const occMixChart = computeOccupancyMix(occupancy?.raw.space_breakdown);
+  const occMixChart = computeOccupancyMix(occupancy?.raw);
 
   const occDeltaVal = occupancy?.occupancy_pct != null && priorOccupancy?.occupancy_pct != null
     ? Math.round(occupancy.occupancy_pct - priorOccupancy.occupancy_pct)
