@@ -45,9 +45,12 @@ const SECTIONS: Section[] = [
   {
     title: "Operating Expenses (OPEX)",
     metrics: [
-      { name: "Payroll", formula: "Salaries, wages, benefits, and payroll taxes for location staff", source: "Yardi Scheduler_Reports, accounts 6010–6099" },
+      { name: "Staffing Costs", formula: "Salaries, wages, benefits, and payroll taxes for location staff", source: "Yardi Scheduler_Reports, accounts 6010–6099" },
       { name: "Facilities", formula: "Rent, CAM charges, insurance, and building maintenance", source: "Yardi Scheduler_Reports, accounts 6200–6399" },
-      { name: "Admin / Legal", formula: "Administrative, legal, and professional service fees", source: "Yardi Scheduler_Reports, accounts 6400–6499" },
+      { name: "Professional Fees", formula: "Tax/accounting, legal, IT, project management, and other professional service fees", source: "Yardi accounts 7410, 7420, 7430, 7440, 7450, 7460" },
+      { name: "Bad Debt", formula: "Written-off outstanding invoices due to collection issues", source: "Yardi account 6210" },
+      { name: "Depreciation", formula: "Depreciation expense on fixed assets", source: "Yardi account 6520" },
+      { name: "License & Business Fees", formula: "Business licenses, royalty/licensing, dues & subscriptions, late fees, service & processing fees", source: "Yardi accounts 6910, 6920, 6930, 6931, 6960, 6970" },
       { name: "Marketing", formula: "Advertising, promotional, and brand spend", source: "Yardi Scheduler_Reports, accounts 6500–6599" },
       { name: "Technology", formula: "Software subscriptions, IT, and tech infrastructure", source: "Yardi Scheduler_Reports, accounts 6600–6699" },
       { name: "Utilities", formula: "Electricity, gas, water, and internet", source: "Yardi Scheduler_Reports, accounts 6700–6799" },

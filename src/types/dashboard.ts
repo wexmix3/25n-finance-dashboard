@@ -47,7 +47,11 @@ export interface OPEXSection {
   facilities: LineItem;
   // Yardi files this as its own "6800 Insurance" section, separate from Facilities.
   insurance: LineItem;
-  admin_legal: LineItem;
+  // Admin & Legal split 2026-08-25 per Christine's request.
+  bad_debt: LineItem;
+  depreciation: LineItem;
+  license_business_fees: LineItem;
+  professional_fees: LineItem;
   marketing: LineItem;
   // Yardi's own "7100 Meals and Entertainment" section, separate from Office Expense.
   meals_entertainment: LineItem;

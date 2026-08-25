@@ -262,15 +262,18 @@ export function PlTable({ current, prior, pacingPct, bare }: Props) {
           <Row label="Operating Expenses" bold separator isExpense actual={is.opex._total.actual} budget={is.opex._total.budget} prior={pi?.opex._total.actual} {...rowProps} />
           {showDetail && (
             <>
-              <Row label="Payroll" indent isExpense actual={is.opex.payroll.actual} budget={is.opex.payroll.budget} prior={pi?.opex.payroll.actual} {...rowProps} />
+              <Row label="Staffing Costs" indent isExpense actual={is.opex.payroll.actual} budget={is.opex.payroll.budget} prior={pi?.opex.payroll.actual} {...rowProps} />
               <Row label="Facilities" indent isExpense actual={is.opex.facilities.actual} budget={is.opex.facilities.budget} prior={pi?.opex.facilities.actual} {...rowProps} />
               <Row label="Insurance" indent isExpense actual={is.opex.insurance.actual} budget={is.opex.insurance.budget} prior={pi?.opex.insurance.actual} {...rowProps} />
-              <Row label="Admin / Legal" indent isExpense actual={is.opex.admin_legal.actual} budget={is.opex.admin_legal.budget} prior={pi?.opex.admin_legal.actual} {...rowProps} />
+              <Row label="Professional Fees" indent isExpense actual={is.opex.professional_fees.actual} budget={is.opex.professional_fees.budget} prior={pi?.opex.professional_fees.actual} {...rowProps} />
+              <Row label="Bad Debt" indent isExpense actual={is.opex.bad_debt.actual} budget={is.opex.bad_debt.budget} prior={pi?.opex.bad_debt.actual} {...rowProps} />
+              <Row label="Depreciation" indent isExpense actual={is.opex.depreciation.actual} budget={is.opex.depreciation.budget} prior={pi?.opex.depreciation.actual} {...rowProps} />
+              <Row label="License & Business Fees" indent isExpense actual={is.opex.license_business_fees.actual} budget={is.opex.license_business_fees.budget} prior={pi?.opex.license_business_fees.actual} {...rowProps} />
               <Row label="Marketing" indent isExpense actual={is.opex.marketing.actual} budget={is.opex.marketing.budget} prior={pi?.opex.marketing.actual} {...rowProps} />
-              <Row label="Meals & Entertainment" indent isExpense actual={is.opex.meals_entertainment.actual} budget={is.opex.meals_entertainment.budget} prior={pi?.opex.meals_entertainment.actual} {...rowProps} />
-              <Row label="Office Expense" indent isExpense actual={is.opex.office_supplies.actual} budget={is.opex.office_supplies.budget} prior={pi?.opex.office_supplies.actual} {...rowProps} />
+              <Row label="Office Equipment & Supplies" indent isExpense actual={is.opex.office_supplies.actual} budget={is.opex.office_supplies.budget} prior={pi?.opex.office_supplies.actual} {...rowProps} />
               <Row label="Technology" indent isExpense actual={is.opex.technology.actual} budget={is.opex.technology.budget} prior={pi?.opex.technology.actual} {...rowProps} />
-              <Row label="Travel" indent isExpense actual={is.opex.travel.actual} budget={is.opex.travel.budget} prior={pi?.opex.travel.actual} {...rowProps} />
+              {/* Travel + Meals & Entertainment combined per Christine's 2026-08-25 request. */}
+              <Row label="Travel" indent isExpense actual={is.opex.travel.actual + is.opex.meals_entertainment.actual} budget={is.opex.travel.budget + is.opex.meals_entertainment.budget} prior={pi ? pi.opex.travel.actual + pi.opex.meals_entertainment.actual : undefined} {...rowProps} />
               <Row label="Utilities" indent isExpense actual={is.opex.utilities.actual} budget={is.opex.utilities.budget} prior={pi?.opex.utilities.actual} {...rowProps} />
               <Row label="Other OPEX" indent isExpense actual={is.opex.other.actual} budget={is.opex.other.budget} prior={pi?.opex.other.actual} {...rowProps} />
             </>

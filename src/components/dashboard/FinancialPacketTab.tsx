@@ -243,16 +243,19 @@ export function FinancialPacketTab({ currentData, packet }: Props) {
               bold separator
             />
             <ISRow label="Operating Expenses" actual={is.opex._total.actual} budget={is.opex._total.budget} bold separator />
-            <ISRow label="Payroll" actual={is.opex.payroll.actual} budget={is.opex.payroll.budget} indent />
+            <ISRow label="Staffing Costs" actual={is.opex.payroll.actual} budget={is.opex.payroll.budget} indent />
             <ISRow label="Facilities" actual={is.opex.facilities.actual} budget={is.opex.facilities.budget} indent />
             <ISRow label="Insurance" actual={is.opex.insurance.actual} budget={is.opex.insurance.budget} indent />
             <ISRow label="Utilities" actual={is.opex.utilities.actual} budget={is.opex.utilities.budget} indent />
             <ISRow label="Marketing" actual={is.opex.marketing.actual} budget={is.opex.marketing.budget} indent />
-            <ISRow label="Meals & Entertainment" actual={is.opex.meals_entertainment.actual} budget={is.opex.meals_entertainment.budget} indent />
-            <ISRow label="Office Expense" actual={is.opex.office_supplies.actual} budget={is.opex.office_supplies.budget} indent />
+            <ISRow label="Office Equipment & Supplies" actual={is.opex.office_supplies.actual} budget={is.opex.office_supplies.budget} indent />
             <ISRow label="Technology" actual={is.opex.technology.actual} budget={is.opex.technology.budget} indent />
-            <ISRow label="Travel" actual={is.opex.travel.actual} budget={is.opex.travel.budget} indent />
-            <ISRow label="Admin / Legal" actual={is.opex.admin_legal.actual} budget={is.opex.admin_legal.budget} indent />
+            {/* Travel + Meals & Entertainment combined per Christine's 2026-08-25 request. */}
+            <ISRow label="Travel" actual={is.opex.travel.actual + is.opex.meals_entertainment.actual} budget={is.opex.travel.budget + is.opex.meals_entertainment.budget} indent />
+            <ISRow label="Professional Fees" actual={is.opex.professional_fees.actual} budget={is.opex.professional_fees.budget} indent />
+            <ISRow label="Bad Debt" actual={is.opex.bad_debt.actual} budget={is.opex.bad_debt.budget} indent />
+            <ISRow label="Depreciation" actual={is.opex.depreciation.actual} budget={is.opex.depreciation.budget} indent />
+            <ISRow label="License & Business Fees" actual={is.opex.license_business_fees.actual} budget={is.opex.license_business_fees.budget} indent />
             <ISRow label="Other OPEX" actual={is.opex.other.actual} budget={is.opex.other.budget} indent />
             <ISRow
               label={`Net Operating Income (${fmtPct(is.net_operating_income.margin_pct)})`}

@@ -51,10 +51,13 @@ const metrics: {
   {
     label: "Revenue",
     bold: true,
-    getValue: d => ({ text: fmt(d.income_statement.revenue._total.actual) }),
+    getValue: d => {
+      const rev = d.income_statement.revenue._total.actual;
+      return { text: fmt(rev), color: rev < 0 ? "text-red-600" : undefined };
+    },
     getConsolidated: snapshots => {
       const total = snapshots.reduce((sum, s) => sum + (s.d?.income_statement.revenue._total.actual ?? 0), 0);
-      return { text: fmt(total) };
+      return { text: fmt(total), color: total < 0 ? "text-red-600" : undefined };
     },
   },
   {
@@ -64,7 +67,7 @@ const metrics: {
       const bud = d.income_statement.revenue._total.budget;
       if (!bud) return { text: "—" };
       const diff = rev - bud;
-      return { text: formatCurrency(diff, { compact: true, showSign: true }), color: diff >= 0 ? "text-emerald-600" : "text-red-600" };
+      return { text: formatCurrency(diff, { compact: true, showSign: true }), color: diff < 0 ? "text-red-600" : undefined };
     },
     getConsolidated: snapshots => {
       let rev = 0, bud = 0, hasBud = false;
@@ -76,15 +79,18 @@ const metrics: {
       }
       if (!hasBud) return { text: "—" };
       const diff = rev - bud;
-      return { text: formatCurrency(diff, { compact: true, showSign: true }), color: diff >= 0 ? "text-emerald-600" : "text-red-600" };
+      return { text: formatCurrency(diff, { compact: true, showSign: true }), color: diff < 0 ? "text-red-600" : undefined };
     },
   },
   {
     label: "Total OPEX",
-    getValue: d => ({ text: fmt(d.income_statement.opex._total.actual) }),
+    getValue: d => {
+      const opex = d.income_statement.opex._total.actual;
+      return { text: fmt(opex), color: opex < 0 ? "text-red-600" : undefined };
+    },
     getConsolidated: snapshots => {
       const total = snapshots.reduce((sum, s) => sum + (s.d?.income_statement.opex._total.actual ?? 0), 0);
-      return { text: fmt(total) };
+      return { text: fmt(total), color: total < 0 ? "text-red-600" : undefined };
     },
   },
   {
@@ -93,11 +99,11 @@ const metrics: {
     separator: true,
     getValue: d => {
       const ni = d.income_statement.net_income.actual;
-      return { text: fmt(ni), color: ni >= 0 ? "text-emerald-600" : "text-red-600" };
+      return { text: fmt(ni), color: ni < 0 ? "text-red-600" : undefined };
     },
     getConsolidated: snapshots => {
       const total = snapshots.reduce((sum, s) => sum + (s.d?.income_statement.net_income.actual ?? 0), 0);
-      return { text: fmt(total), color: total >= 0 ? "text-emerald-600" : "text-red-600" };
+      return { text: fmt(total), color: total < 0 ? "text-red-600" : undefined };
     },
   },
   {
@@ -145,7 +151,7 @@ const metrics: {
     getValue: (_d, records, currentMonth) => {
       const ytd = computeYTD(records, currentMonth);
       if (!ytd) return { text: "—" };
-      return { text: fmt(ytd.ni), color: ytd.ni >= 0 ? "text-emerald-600" : "text-red-600" };
+      return { text: fmt(ytd.ni), color: ytd.ni < 0 ? "text-red-600" : undefined };
     },
     getConsolidated: (snapshots, currentMonth) => {
       let total = 0, any = false;
@@ -154,7 +160,7 @@ const metrics: {
         if (ytd) { total += ytd.ni; any = true; }
       }
       if (!any) return { text: "—" };
-      return { text: fmt(total), color: total >= 0 ? "text-emerald-600" : "text-red-600" };
+      return { text: fmt(total), color: total < 0 ? "text-red-600" : undefined };
     },
   },
 ];

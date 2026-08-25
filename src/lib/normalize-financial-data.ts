@@ -8,8 +8,9 @@ const REVENUE_KEYS: (keyof IncomeStatement["revenue"])[] = [
 ];
 
 const OPEX_KEYS: (keyof IncomeStatement["opex"])[] = [
-  "payroll", "facilities", "insurance", "admin_legal", "marketing",
-  "meals_entertainment", "office_supplies", "technology", "travel",
+  "payroll", "facilities", "insurance",
+  "bad_debt", "depreciation", "license_business_fees", "professional_fees",
+  "marketing", "meals_entertainment", "office_supplies", "technology", "travel",
   "utilities", "other", "_total",
 ];
 

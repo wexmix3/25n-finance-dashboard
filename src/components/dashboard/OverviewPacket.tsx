@@ -103,6 +103,12 @@ export function OverviewPacket({
   const opNI = is.net_operating_income.actual;
   const priorOpNI = priorData?.income_statement.net_operating_income.actual;
 
+  // Normalize partial-month expenses to a full-month run rate before using
+  // them as a burn-rate denominator -- dividing cash by a partial month's
+  // spend otherwise overstates "months of cash" the earlier in the month
+  // it's viewed (Christine flagged 2026-08-25).
+  const monthlyBurn = pacingPct && pacingPct > 0 && pacingPct < 1 ? totalExpenses / pacingPct : totalExpenses;
+
   const bsSummary = packet?.data.balance_sheet && !packet.data.balance_sheet.error
     ? packet.data.balance_sheet.summary
     : null;
@@ -130,15 +136,19 @@ export function OverviewPacket({
 
   // Operating expense mix — same sort, highest $ to lowest.
   const opexLines: { label: string; value: number }[] = [
-    { label: "Payroll", value: opex.payroll.actual },
+    { label: "Staffing Costs", value: opex.payroll.actual },
     { label: "Facilities", value: opex.facilities.actual },
     { label: "Insurance", value: opex.insurance.actual },
-    { label: "Admin & Legal", value: opex.admin_legal.actual },
+    { label: "Professional Fees", value: opex.professional_fees.actual },
+    { label: "Bad Debt", value: opex.bad_debt.actual },
+    { label: "Depreciation", value: opex.depreciation.actual },
+    { label: "License & Business Fees", value: opex.license_business_fees.actual },
     { label: "Marketing", value: opex.marketing.actual },
-    { label: "Meals & Entertainment", value: opex.meals_entertainment.actual },
-    { label: "Office Supplies", value: opex.office_supplies.actual },
+    // Travel + Meals & Entertainment combined into one line per Christine's
+    // 2026-08-25 request.
+    { label: "Travel", value: opex.travel.actual + opex.meals_entertainment.actual },
+    { label: "Office Equipment & Supplies", value: opex.office_supplies.actual },
     { label: "Technology", value: opex.technology.actual },
-    { label: "Travel", value: opex.travel.actual },
     { label: "Utilities", value: opex.utilities.actual },
     { label: "Other", value: opex.other.actual },
   ].sort((a, b) => b.value - a.value);
@@ -248,7 +258,7 @@ export function OverviewPacket({
                   <Row label="Working Capital" value={fmt(workingCapital)} />
                   <Row label="Cash as % of Current Liabilities" value={bsSummary.current_liabilities !== 0 ? pct((bsSummary.cash_and_bank / bsSummary.current_liabilities) * 100) : "—"} />
                   <Row label="Operating Margin (PTD)" value={Math.abs(totalIncome) >= MARGIN_REVENUE_FLOOR ? pctAcct((opNI / totalIncome) * 100) : "N/A · low revenue"} />
-                  <Row label="Months of Cash at Current Burn" value={totalExpenses > 0 ? Math.round(bsSummary.cash_and_bank / totalExpenses).toString() : "—"} />
+                  <Row label="Months of Cash at Current Burn" value={monthlyBurn > 0 ? `${(bsSummary.cash_and_bank / monthlyBurn).toFixed(1)}` : "—"} />
                   <Row label="Balance Sheet Check (A = L + C)" value={Math.abs(bsSummary.balance_check) < 1 ? "OK" : fmt(bsSummary.balance_check)} bold last positive={Math.abs(bsSummary.balance_check) < 1} />
                 </tbody>
               </table>
