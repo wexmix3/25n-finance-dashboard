@@ -1,6 +1,7 @@
 "use client";
 
 import { LOCATIONS, Location } from "@/types/dashboard";
+import { fmtOccPct } from "@/lib/occupancy";
 
 export type OccupancyHighlight = "none" | "glow-ring";
 
@@ -31,10 +32,6 @@ const LOCATION_ACCENT: Record<Location, { dot: string; bg: string }> = {
   Schaumburg: { dot: "bg-rose-400", bg: "bg-rose-50/50" },
   Uptown: { dot: "bg-indigo-400", bg: "bg-indigo-50/50" },
 };
-
-function fmtPct(v: number | null | undefined): string {
-  return v != null ? `${Math.round(v)}%` : "—";
-}
 
 function average(values: number[]): number | null {
   return values.length > 0 ? values.reduce((a, b) => a + b, 0) / values.length : null;
@@ -82,11 +79,11 @@ export function OccupancyHistoryTable({ title, subtitle, rows, highlight = "none
                 <td className="px-4 py-2 text-xs font-medium text-gray-600 border-r border-gray-100">{month}</td>
                 {LOCATIONS.map(loc => (
                   <td key={loc} className={`px-4 py-2 text-right tabular-nums text-xs font-medium text-gray-700 border-r border-gray-100 ${LOCATION_ACCENT[loc].bg} ${DATA_COL_WIDTH}`}>
-                    {fmtPct(byLocation[loc])}
+                    {fmtOccPct(byLocation[loc])}
                   </td>
                 ))}
                 <td className={`px-4 py-2 text-right tabular-nums text-xs font-semibold text-gray-700 ${DATA_COL_WIDTH}`}>
-                  {fmtPct(total)}
+                  {fmtOccPct(total)}
                 </td>
               </tr>
             );
@@ -97,11 +94,11 @@ export function OccupancyHistoryTable({ title, subtitle, rows, highlight = "none
             <td className="px-4 py-2.5 text-xs font-bold text-gray-900 border-r border-gray-200">Average</td>
             {LOCATIONS.map(loc => (
               <td key={loc} className={`px-4 py-2.5 text-right tabular-nums text-xs font-bold text-gray-900 border-r border-gray-200 ${DATA_COL_WIDTH}`}>
-                {fmtPct(locationAverages[loc])}
+                {fmtOccPct(locationAverages[loc])}
               </td>
             ))}
             <td className={`px-4 py-2.5 text-right tabular-nums text-xs font-bold text-gray-900 ${DATA_COL_WIDTH}`}>
-              {fmtPct(overallAverage)}
+              {fmtOccPct(overallAverage)}
             </td>
           </tr>
         </tfoot>

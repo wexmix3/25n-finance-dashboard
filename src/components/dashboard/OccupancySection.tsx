@@ -3,7 +3,7 @@
 import type { OccupancyData } from "@/types/dashboard";
 import { formatCurrency } from "@/lib/formatCurrency";
 import { BarChart, Bar, Cell, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, LabelList } from "recharts";
-import { occupancyMetricValue, occupancyMetricUnits } from "@/lib/occupancy";
+import { occupancyMetricValue, occupancyMetricUnits, fmtOccPct } from "@/lib/occupancy";
 
 interface Props {
   current: OccupancyData | null;
@@ -20,9 +20,9 @@ interface Props {
  * Overview hero's Occupancy card, which needs the same formatting. */
 export function occupancyDeltaLabel(curr: number | undefined, prev: number | undefined): string | null {
   if (curr == null || prev == null || prev === 0) return null;
-  const d = Math.round(curr - prev);
+  const d = Math.round((curr - prev) * 10) / 10;
   if (d === 0) return "flat MoM";
-  return d > 0 ? `+${d}% MoM` : `(${Math.abs(d)}%) MoM`;
+  return d > 0 ? `+${d.toFixed(1)}% MoM` : `(${Math.abs(d).toFixed(1)}%) MoM`;
 }
 
 function fmt$(n: number | undefined): string {
@@ -58,7 +58,7 @@ export function OccupancyTrendChart({ history, title = "6-Month Occupancy Trend"
             width={36}
           />
           <Tooltip
-            formatter={(value) => [`${value}%`, "Occupancy"]}
+            formatter={(value) => [fmtOccPct(Number(value)), "Occupancy"]}
             labelStyle={{ fontSize: 11, fontWeight: 600 }}
             contentStyle={{ fontSize: 11, border: "1px solid #e5e7eb", borderRadius: 8 }}
             cursor={{ fill: "#F15B27", fillOpacity: 0.06 }}
@@ -73,7 +73,7 @@ export function OccupancyTrendChart({ history, title = "6-Month Occupancy Trend"
             <LabelList
               dataKey="occupancy_pct"
               position="top"
-              formatter={(v: unknown) => (v == null ? "" : `${v}%`)}
+              formatter={(v: unknown) => (v == null ? "" : fmtOccPct(Number(v)))}
               style={{ fontSize: 10, fontWeight: 600, fill: "#6b7280" }}
             />
           </Bar>
@@ -140,7 +140,7 @@ export function OccupancySection({ current, prior, expectedMonth, history }: Pro
         <div>
           <p className="text-xs text-gray-400 mb-0.5">Occupancy</p>
           <p className="text-2xl font-semibold text-gray-900">
-            {current.occupancy_pct != null ? `${current.occupancy_pct}%` : "—"}
+            {fmtOccPct(current.occupancy_pct)}
           </p>
           {occDelta && (
             <p className={`text-xs mt-0.5 ${occDelta.startsWith("(") ? "text-red-600" : occDelta.startsWith("+") ? "text-emerald-600" : "text-gray-400"}`}>
@@ -153,7 +153,7 @@ export function OccupancySection({ current, prior, expectedMonth, history }: Pro
         <div>
           <p className="text-xs text-gray-400 mb-0.5">Private Offices Occupied</p>
           <p className="text-2xl font-semibold text-gray-900">
-            {privateOfficePct != null ? `${privateOfficePct}%` : "—"}
+            {fmtOccPct(privateOfficePct)}
           </p>
           {privateOfficeUnits && (
             <p className="text-xs text-gray-400 mt-0.5">{privateOfficeUnits.occupied} of {privateOfficeUnits.total}</p>
@@ -169,7 +169,7 @@ export function OccupancySection({ current, prior, expectedMonth, history }: Pro
         <div>
           <p className="text-xs text-gray-400 mb-0.5">Dedicated Desks Occupied</p>
           <p className="text-2xl font-semibold text-gray-900">
-            {dedicatedDeskPct != null ? `${dedicatedDeskPct}%` : "—"}
+            {fmtOccPct(dedicatedDeskPct)}
           </p>
           {dedicatedDeskUnits && (
             <p className="text-xs text-gray-400 mt-0.5">{dedicatedDeskUnits.occupied} of {dedicatedDeskUnits.total}</p>
@@ -197,7 +197,7 @@ export function OccupancySection({ current, prior, expectedMonth, history }: Pro
           <div className="flex items-center gap-6 mb-2 mt-3">
             {current.raw.ytd_occupancy_pct != null && (
               <p className="text-xs text-gray-500">
-                <span className="font-semibold text-gray-700">{current.raw.ytd_occupancy_pct}%</span> YTD occupancy
+                <span className="font-semibold text-gray-700">{fmtOccPct(current.raw.ytd_occupancy_pct)}</span> YTD occupancy
               </p>
             )}
             {current.raw.ytd_revenue != null && (
@@ -212,7 +212,7 @@ export function OccupancySection({ current, prior, expectedMonth, history }: Pro
                 <div key={sb.space_type} className="rounded border border-gray-100 bg-gray-50 px-2.5 py-2">
                   <p className="text-[11px] text-gray-500">{sb.space_type}</p>
                   <p className="text-sm font-semibold text-gray-800 tabular-nums">
-                    {Math.round(sb.occupancy_rate * 100)}%
+                    {fmtOccPct(sb.occupancy_rate * 100)}
                     <span className="text-[11px] font-normal text-gray-400 ml-1">
                       ({Math.round(sb.occupied_units)}/{Math.round(sb.total_units)})
                     </span>

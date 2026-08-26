@@ -3,15 +3,14 @@
 import type { FinancialData, MonthlyRecord } from "@/types/dashboard";
 import { LOCATIONS, Location } from "@/types/dashboard";
 import { formatCurrency } from "@/lib/formatCurrency";
+import { ytdRecordsThrough } from "@/lib/months";
 
 function fmt(n: number): string {
   return formatCurrency(n, { compact: true });
 }
 
 function computeYTD(records: MonthlyRecord[], currentMonth: string): { revenue: number; ni: number } | null {
-  const [, yearStr] = currentMonth.split(" ");
-  if (!yearStr) return null;
-  const ytd = records.filter(r => r.month.endsWith(yearStr));
+  const ytd = ytdRecordsThrough(records, currentMonth);
   if (ytd.length === 0) return null;
   return ytd.reduce(
     (acc, r) => ({

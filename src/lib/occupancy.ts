@@ -1,5 +1,14 @@
 import type { OccupancyData } from "@/types/dashboard";
 
+/** Every occupancy percentage in the app renders through this one formatter
+ * so "XX.X%" precision is consistent everywhere -- previously each call site
+ * rounded independently (some `Math.round`, some raw), so the same data
+ * showed as "80%" in one table and "80.0%" nowhere, or "86.7%" next to a
+ * whole-number "67%" in the same column. Flagged by Max 2026-08-25. */
+export function fmtOccPct(v: number | null | undefined, digits = 1): string {
+  return v != null ? `${v.toFixed(digits)}%` : "—";
+}
+
 /** Which occupancy figure a caller wants: the blended Total Space number,
  * or one of the two space-type breakouts Christine cares about most. */
 export type OccupancyMetric = "total" | "private_office" | "dedicated_desk";

@@ -13,7 +13,7 @@ import { TrendChart } from "@/components/dashboard/TrendChart";
 import { OverviewPacket, computeOccupancyMixRollup } from "@/components/dashboard/OverviewPacket";
 import { OccupancySection, occupancyDeltaLabel, OccupancyTrendChart } from "@/components/dashboard/OccupancySection";
 import { OccupancyHistoryTable } from "@/components/dashboard/OccupancyHistoryTable";
-import { occupancyMetricValue, type OccupancyMetric } from "@/lib/occupancy";
+import { occupancyMetricValue, fmtOccPct, type OccupancyMetric } from "@/lib/occupancy";
 import { LocationSummaryTable } from "@/components/dashboard/LocationSummaryTable";
 import { DataDictionary } from "@/components/dashboard/DataDictionary";
 import { GLCheckTab } from "@/components/dashboard/GLCheckTab";
@@ -539,7 +539,7 @@ export function DashboardClient({ locationData, packetData, userEmail, role, glI
                 />
                 <HeroCard
                   label={`Occupancy · ${consolidatedDisplayMonth}`}
-                  value={portfolioOcc.avg != null ? `${Math.round(portfolioOcc.avg)}%` : "—"}
+                  value={fmtOccPct(portfolioOcc.avg)}
                   sub={
                     portfolioOcc.avg == null
                       ? "No occupancy data yet"

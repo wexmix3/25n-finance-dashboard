@@ -1,8 +1,10 @@
 "use client";
 
 import { useSyncExternalStore } from "react";
-import type { Location, FinancialData, OccupancyData, TrendPoint, MonthlyPacket, LineItem, MonthlyRecord } from "@/types/dashboard";
+import type { Location, FinancialData, OccupancyData, TrendPoint, MonthlyPacket, LineItem, MonthlyRecord, IncomeStatement } from "@/types/dashboard";
 import { formatCurrency, formatSignedPct, MARGIN_REVENUE_FLOOR } from "@/lib/formatCurrency";
+import { fmtOccPct } from "@/lib/occupancy";
+import { ytdRecordsThrough } from "@/lib/months";
 import {
   BarChart, Bar, Cell, XAxis, YAxis, CartesianGrid, Tooltip as RTooltip, ResponsiveContainer,
   PieChart, Pie, Cell as PieCell,
@@ -44,9 +46,7 @@ const MIX_COLORS = ["#F15B27", "#f5a15a", "#2c5a82", "#6b9bc3", "#9aa5b1", "#c9c
 // computeYTD, extended to opex since the KPI strip needs a Total Expenses
 // YTD figure that table doesn't.
 function computeYTDTotals(records: MonthlyRecord[], currentMonth: string): { revenue: number; opex: number; opNI: number } | null {
-  const [, yearStr] = currentMonth.split(" ");
-  if (!yearStr) return null;
-  const ytdRecords = records.filter(r => r.month.endsWith(yearStr));
+  const ytdRecords = ytdRecordsThrough(records, currentMonth);
   if (ytdRecords.length === 0) return null;
   return ytdRecords.reduce(
     (acc, r) => ({
@@ -56,6 +56,26 @@ function computeYTDTotals(records: MonthlyRecord[], currentMonth: string): { rev
     }),
     { revenue: 0, opex: 0, opNI: 0 }
   );
+}
+
+/** Per-line YTD sums for the Revenue Mix / Operating Expense Mix tables
+ * (Max's 2026-08-25 ask) -- same year-to-date-through-current-month window
+ * as computeYTDTotals above, just broken out per line item instead of
+ * summed to one total. Works for any location/month since it's driven
+ * entirely by the `records` and `defs` passed in, not hardcoded to one
+ * location. */
+function computeYTDLines(
+  records: MonthlyRecord[],
+  currentMonth: string,
+  defs: { label: string; get: (is: IncomeStatement) => number }[]
+): Record<string, number> | null {
+  const ytdRecords = ytdRecordsThrough(records, currentMonth).filter(r => r.data);
+  if (ytdRecords.length === 0) return null;
+  const totals: Record<string, number> = {};
+  for (const d of defs) {
+    totals[d.label] = ytdRecords.reduce((sum, r) => sum + d.get(r.data!.income_statement), 0);
+  }
+  return totals;
 }
 
 // Same five core space types the Occupancy tab already scores into
@@ -210,42 +230,53 @@ export function OverviewPacket({
   // donut stays legible instead of a ring of unreadable slivers. Sorted
   // highest $ to lowest (Christine's 2026-08-24 ask) before grouping, so
   // "Other" (grouped small slices) still lands last regardless.
-  const revenueLines: { label: string; value: number }[] = [
-    { label: "Workspace Rental", value: rev.workspace_rental.actual },
-    { label: "Meeting Space", value: rev.meeting_space.actual },
-    { label: "Package Revenue", value: rev.package_revenue.actual },
-    { label: "Membership Income", value: rev.membership.actual },
-    { label: "Member Amenities", value: rev.member_amenities.actual },
-    { label: "Registration & Access", value: rev.registration_access.actual },
-    { label: "Miscellaneous", value: rev.miscellaneous.actual },
-  ].sort((a, b) => b.value - a.value);
+  // `get` accessors (not just the current-period `value`) let the same line
+  // defs drive computeYTDLines below, so the YTD column can't drift from
+  // the current-period column (Max's 2026-08-25 "add YTD" ask).
+  const revenueLineDefs: { label: string; get: (is: IncomeStatement) => number }[] = [
+    { label: "Workspace Rental", get: is => is.revenue.workspace_rental.actual },
+    { label: "Meeting Space", get: is => is.revenue.meeting_space.actual },
+    { label: "Package Revenue", get: is => is.revenue.package_revenue.actual },
+    { label: "Membership Income", get: is => is.revenue.membership.actual },
+    { label: "Member Amenities", get: is => is.revenue.member_amenities.actual },
+    { label: "Registration & Access", get: is => is.revenue.registration_access.actual },
+    { label: "Miscellaneous", get: is => is.revenue.miscellaneous.actual },
+  ];
+  const revenueLines = revenueLineDefs
+    .map(d => ({ label: d.label, value: d.get(is) }))
+    .sort((a, b) => b.value - a.value);
   const revenueMixChart = groupSmallSlices(revenueLines, totalIncome);
+  const ytdRevenueByLabel = computeYTDLines(records, currentData.month, revenueLineDefs);
 
   // Operating expense mix — same sort, highest $ to lowest.
-  const opexLines: { label: string; value: number }[] = [
-    { label: "Staffing Costs", value: opex.payroll.actual },
-    { label: "Facilities", value: opex.facilities.actual },
-    { label: "Insurance", value: opex.insurance.actual },
-    { label: "Professional Fees", value: opex.professional_fees.actual },
-    { label: "Bad Debt", value: opex.bad_debt.actual },
-    { label: "Depreciation", value: opex.depreciation.actual },
-    { label: "License & Business Fees", value: opex.license_business_fees.actual },
-    { label: "Marketing", value: opex.marketing.actual },
+  const opexLineDefs: { label: string; get: (is: IncomeStatement) => number }[] = [
+    { label: "Staffing Costs", get: is => is.opex.payroll.actual },
+    { label: "Facilities", get: is => is.opex.facilities.actual },
+    { label: "Insurance", get: is => is.opex.insurance.actual },
+    { label: "Professional Fees", get: is => is.opex.professional_fees.actual },
+    { label: "Bad Debt", get: is => is.opex.bad_debt.actual },
+    { label: "Depreciation", get: is => is.opex.depreciation.actual },
+    { label: "License & Business Fees", get: is => is.opex.license_business_fees.actual },
+    { label: "Marketing", get: is => is.opex.marketing.actual },
     // Travel + Meals & Entertainment combined into one line per Christine's
     // 2026-08-25 request.
-    { label: "Travel", value: opex.travel.actual + opex.meals_entertainment.actual },
-    { label: "Office Equipment & Supplies", value: opex.office_supplies.actual },
-    { label: "Technology", value: opex.technology.actual },
-    { label: "Utilities", value: opex.utilities.actual },
-    { label: "Other", value: opex.other.actual },
-  ].sort((a, b) => b.value - a.value);
+    { label: "Travel", get: is => is.opex.travel.actual + is.opex.meals_entertainment.actual },
+    { label: "Office Equipment & Supplies", get: is => is.opex.office_supplies.actual },
+    { label: "Technology", get: is => is.opex.technology.actual },
+    { label: "Utilities", get: is => is.opex.utilities.actual },
+    { label: "Other", get: is => is.opex.other.actual },
+  ];
+  const opexLines = opexLineDefs
+    .map(d => ({ label: d.label, value: d.get(is) }))
+    .sort((a, b) => b.value - a.value);
+  const ytdOpexByLabel = computeYTDLines(records, currentData.month, opexLineDefs);
 
   // Occupancy mix — same five core space types the Occupancy tab already
   // scores into occupancy_pct (Day Office / Meeting Rooms excluded there too).
   const occMixChart = computeOccupancyMix(occupancy?.raw);
 
   const occDeltaVal = occupancy?.occupancy_pct != null && priorOccupancy?.occupancy_pct != null
-    ? Math.round(occupancy.occupancy_pct - priorOccupancy.occupancy_pct)
+    ? Math.round((occupancy.occupancy_pct - priorOccupancy.occupancy_pct) * 10) / 10
     : null;
 
   const isPartial = pacingPct !== null && pacingPct < 1;
@@ -283,9 +314,9 @@ export function OverviewPacket({
         <KpiTile label="Total Expenses (PTD)" value={fmt(totalExpenses)} ytd={ytd ? `YTD ${fmt(ytd.opex, true)}` : undefined} tone="neutral" />
         <KpiTile
           label="Occupancy (PTD)"
-          value={occupancy?.occupancy_pct != null ? `${occupancy.occupancy_pct}%` : "—"}
-          sub={occDeltaVal != null ? `${occDeltaVal >= 0 ? "+" : "("}${Math.abs(occDeltaVal)}${occDeltaVal < 0 ? "%)" : "%"} MoM` : undefined}
-          ytd={occupancy?.raw.ytd_occupancy_pct != null ? `YTD ${occupancy.raw.ytd_occupancy_pct}%` : undefined}
+          value={fmtOccPct(occupancy?.occupancy_pct)}
+          sub={occDeltaVal != null ? `${occDeltaVal >= 0 ? "+" : "("}${Math.abs(occDeltaVal).toFixed(1)}${occDeltaVal < 0 ? "%)" : "%"} MoM` : undefined}
+          ytd={occupancy?.raw.ytd_occupancy_pct != null ? `YTD ${fmtOccPct(occupancy.raw.ytd_occupancy_pct)}` : undefined}
           tone="brand"
         />
       </div>
@@ -388,7 +419,7 @@ export function OverviewPacket({
                   <td className="px-4 sm:px-5 py-2 text-[#F15B27] font-semibold">Occupancy %</td>
                   {trend.map(t => {
                     const o = occupancyTrend.find(x => x.month === t.month)?.occupancy_pct ?? null;
-                    return <td key={t.month} className="text-right px-4 sm:px-5 py-2 tabular-nums text-gray-800">{o != null ? `${Math.round(o)}%` : "—"}</td>;
+                    return <td key={t.month} className="text-right px-4 sm:px-5 py-2 tabular-nums text-gray-800">{fmtOccPct(o)}</td>;
                   })}
                 </tr>
               </tbody>
@@ -434,12 +465,12 @@ export function OverviewPacket({
         <SectionBand n={4} title="Revenue Mix (Period to Date)" />
         <SectionShell>
           <table className="w-full text-[13px]">
-            <thead><tr className="border-b border-gray-100"><th className="text-left font-semibold text-gray-400 text-[10.5px] uppercase px-4 sm:px-5 py-2">&nbsp;</th><th className="text-right font-semibold text-gray-400 text-[10.5px] uppercase px-4 sm:px-5 py-2">{currentData.month.split(" ")[0]} Actual</th><th className="text-right font-semibold text-gray-400 text-[10.5px] uppercase px-4 sm:px-5 py-2">% of Income</th></tr></thead>
+            <thead><tr className="border-b border-gray-100"><th className="text-left font-semibold text-gray-400 text-[10.5px] uppercase px-4 sm:px-5 py-2">&nbsp;</th><th className="text-right font-semibold text-gray-400 text-[10.5px] uppercase px-4 sm:px-5 py-2">{currentData.month.split(" ")[0]} Actual</th><th className="text-right font-semibold text-gray-400 text-[10.5px] uppercase px-4 sm:px-5 py-2">% of Income</th>{ytdRevenueByLabel && <th className="text-right font-semibold text-gray-400 text-[10.5px] uppercase px-4 sm:px-5 py-2">YTD Actual</th>}</tr></thead>
             <tbody>
               {revenueLines.map(l => (
-                <Row key={l.label} label={l.label} value={fmt(l.value)} pctVal={totalIncome !== 0 ? pct((l.value / totalIncome) * 100) : "—"} />
+                <Row key={l.label} label={l.label} value={fmt(l.value)} pctVal={totalIncome !== 0 ? pct((l.value / totalIncome) * 100) : "—"} extra={ytdRevenueByLabel ? fmt(ytdRevenueByLabel[l.label]) : undefined} />
               ))}
-              <Row label="Total Income" value={fmt(totalIncome)} pctVal="100.0%" bold last />
+              <Row label="Total Income" value={fmt(totalIncome)} pctVal="100.0%" extra={ytdRevenueByLabel ? fmt(ytd!.revenue) : undefined} bold last />
             </tbody>
           </table>
         </SectionShell>
@@ -450,12 +481,12 @@ export function OverviewPacket({
         <SectionBand n={5} title="Operating Expense Mix (Period to Date)" />
         <SectionShell>
           <table className="w-full text-[13px]">
-            <thead><tr className="border-b border-gray-100"><th className="text-left font-semibold text-gray-400 text-[10.5px] uppercase px-4 sm:px-5 py-2">&nbsp;</th><th className="text-right font-semibold text-gray-400 text-[10.5px] uppercase px-4 sm:px-5 py-2">{currentData.month.split(" ")[0]} Actual</th><th className="text-right font-semibold text-gray-400 text-[10.5px] uppercase px-4 sm:px-5 py-2">% of Expenses</th></tr></thead>
+            <thead><tr className="border-b border-gray-100"><th className="text-left font-semibold text-gray-400 text-[10.5px] uppercase px-4 sm:px-5 py-2">&nbsp;</th><th className="text-right font-semibold text-gray-400 text-[10.5px] uppercase px-4 sm:px-5 py-2">{currentData.month.split(" ")[0]} Actual</th><th className="text-right font-semibold text-gray-400 text-[10.5px] uppercase px-4 sm:px-5 py-2">% of Expenses</th>{ytdOpexByLabel && <th className="text-right font-semibold text-gray-400 text-[10.5px] uppercase px-4 sm:px-5 py-2">YTD Actual</th>}</tr></thead>
             <tbody>
               {opexLines.map(l => (
-                <Row key={l.label} label={l.label} value={fmt(l.value)} pctVal={totalExpenses !== 0 ? pct((l.value / totalExpenses) * 100) : "—"} />
+                <Row key={l.label} label={l.label} value={fmt(l.value)} pctVal={totalExpenses !== 0 ? pct((l.value / totalExpenses) * 100) : "—"} extra={ytdOpexByLabel ? fmt(ytdOpexByLabel[l.label]) : undefined} />
               ))}
-              <Row label="Total Operating Expenses" value={fmt(totalExpenses)} pctVal="100.0%" bold last />
+              <Row label="Total Operating Expenses" value={fmt(totalExpenses)} pctVal="100.0%" extra={ytdOpexByLabel ? fmt(ytd!.opex) : undefined} bold last />
             </tbody>
           </table>
         </SectionShell>
@@ -500,7 +531,7 @@ function OccupancyMixHistory({ trend }: { trend: { month: string; mix: { label: 
                   const v = t.mix.find(m => m.label === label)?.value;
                   return (
                     <td key={t.month} className={`text-right tabular-nums px-2 py-1.5 ${t.month === lastMonth ? "font-semibold text-gray-900" : "text-gray-500"}`}>
-                      {v != null ? `${v}%` : "—"}
+                      {fmtOccPct(v)}
                     </td>
                   );
                 })}
@@ -545,7 +576,7 @@ function MixDonut({ data, suffix }: { data: { label: string; value: number }[]; 
           <li key={d.label} className="flex items-center gap-1.5 truncate">
             <span className="w-2 h-2 rounded-sm flex-shrink-0" style={{ backgroundColor: MIX_COLORS[i % MIX_COLORS.length] }} />
             <span className="truncate">{d.label}</span>
-            <span className="ml-auto font-semibold text-gray-800 tabular-nums flex-shrink-0">{suffix ? `${d.value}${suffix}` : `${((d.value / data.reduce((s, x) => s + x.value, 0)) * 100).toFixed(0)}%`}</span>
+            <span className="ml-auto font-semibold text-gray-800 tabular-nums flex-shrink-0">{suffix ? `${d.value.toFixed(1)}${suffix}` : `${((d.value / data.reduce((s, x) => s + x.value, 0)) * 100).toFixed(0)}%`}</span>
           </li>
         ))}
       </ul>
@@ -569,12 +600,13 @@ function KpiTile({ label, value, sub, ytd, tone }: { label: string; value: strin
   );
 }
 
-function Row({ label, value, pctVal, bold, last, positive }: { label: string; value: string; pctVal?: string; bold?: boolean; last?: boolean; positive?: boolean }) {
+function Row({ label, value, pctVal, extra, bold, last, positive }: { label: string; value: string; pctVal?: string; extra?: string; bold?: boolean; last?: boolean; positive?: boolean }) {
   return (
     <tr className={last ? "border-t border-gray-200" : "border-b border-gray-50"}>
       <td className={`px-4 sm:px-5 py-2 ${bold ? "font-bold text-gray-900" : "text-gray-700"}`}>{label}</td>
       <td className={`text-right px-4 sm:px-5 py-2 tabular-nums ${bold ? "font-bold" : ""} ${positive ? "text-emerald-700" : value.startsWith("(") ? "text-red-600" : "text-gray-800"}`}>{value}</td>
       {pctVal !== undefined && <td className={`text-right px-4 sm:px-5 py-2 tabular-nums text-gray-500 ${bold ? "font-bold" : ""}`}>{pctVal}</td>}
+      {extra !== undefined && <td className={`text-right px-4 sm:px-5 py-2 tabular-nums ${bold ? "font-bold text-gray-900" : "text-gray-700"}`}>{extra}</td>}
     </tr>
   );
 }
