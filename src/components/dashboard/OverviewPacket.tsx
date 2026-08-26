@@ -16,7 +16,7 @@ interface Props {
   priorData: FinancialData | null;
   /** Every month on file for this location -- used to compute YTD figures
    * on the KPI strip (Christine's "add YTD to these boxes" request). Same
-   * source and same year-to-date-through-current-month definition as
+   * source and same floating-YTD definition as
    * LocationSummaryTable's Consolidated YTD row, so the two can't disagree. */
   records: MonthlyRecord[];
   occupancy: OccupancyData | null;
@@ -42,9 +42,11 @@ const BRAND = "#F15B27";
 const NEG = "#dc2626";
 const MIX_COLORS = ["#F15B27", "#f5a15a", "#2c5a82", "#6b9bc3", "#9aa5b1", "#c9cfd6"];
 
-// Same year-to-date-through-current-month definition as LocationSummaryTable's
-// computeYTD, extended to opex since the KPI strip needs a Total Expenses
-// YTD figure that table doesn't.
+// Same floating-YTD definition as LocationSummaryTable's computeYTD
+// (sums every record on file for the calendar year, regardless of which
+// period is being viewed -- Max's explicit "YTD stays floating" call),
+// extended to opex since the KPI strip needs a Total Expenses YTD figure
+// that table doesn't.
 function computeYTDTotals(records: MonthlyRecord[], currentMonth: string): { revenue: number; opex: number; opNI: number } | null {
   const ytdRecords = ytdRecordsThrough(records, currentMonth);
   if (ytdRecords.length === 0) return null;
@@ -59,8 +61,8 @@ function computeYTDTotals(records: MonthlyRecord[], currentMonth: string): { rev
 }
 
 /** Per-line YTD sums for the Revenue Mix / Operating Expense Mix tables
- * (Max's 2026-08-25 ask) -- same year-to-date-through-current-month window
- * as computeYTDTotals above, just broken out per line item instead of
+ * (Max's 2026-08-25 ask) -- same floating-YTD window as computeYTDTotals
+ * above, just broken out per line item instead of
  * summed to one total. Works for any location/month since it's driven
  * entirely by the `records` and `defs` passed in, not hardcoded to one
  * location. */
