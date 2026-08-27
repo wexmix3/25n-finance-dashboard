@@ -37,7 +37,7 @@ export async function POST(request: NextRequest) {
     // Upsert: update if the period isn't locked, reject if locked
     const { data: existing } = await supabase
       .from("monthly_financials")
-      .select("locked")
+      .select("locked, data")
       .eq("location", location)
       .eq("month", month)
       .single();
@@ -45,6 +45,19 @@ export async function POST(request: NextRequest) {
     if (existing?.locked) {
       results.push({ location, month, status: "locked — not updated" });
       continue;
+    }
+
+    // Never let an empty/missing insights array (e.g. a Haiku call that
+    // failed or was skipped upstream) overwrite a previously-generated one --
+    // insights generation is best-effort and its failure shouldn't destroy
+    // good data already on file. Root cause of a real incident 2026-08-27:
+    // an automated pipeline pushed with insights=[] and silently wiped
+    // "Today's Key Insight" for every location. See
+    // state/worksheets/25n-insights-silent-wipe-2026-08-27.md.
+    const recordTyped = record as { insights?: string[] };
+    const existingInsights = (existing?.data as { insights?: string[] } | undefined)?.insights;
+    if ((!recordTyped.insights || recordTyped.insights.length === 0) && existingInsights?.length) {
+      recordTyped.insights = existingInsights;
     }
 
     const { error } = await supabase
