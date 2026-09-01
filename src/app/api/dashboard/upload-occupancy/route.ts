@@ -24,7 +24,7 @@ export async function GET(request: NextRequest) {
   const supabase = createServiceClient();
   const { data, error } = await supabase
     .from("monthly_occupancy")
-    .select("data")
+    .select("data, uploaded_at, locked")
     .eq("location", location)
     .eq("month", month)
     .single();
@@ -33,7 +33,13 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: "not found" }, { status: 404 });
   }
 
-  return NextResponse.json({ data: data.data });
+  // uploaded_at/locked added 2026-09-01 for the day-1 occupancy-lock
+  // fallback (scripts/month-close via 25n-occupancy-daily.yml): it needs to
+  // verify a still-unlocked record's data actually reflects the last
+  // calendar day of the closed month before re-locking it as-is, rather
+  // than trusting `data.lock` alone (which only ever gets set on a --lock
+  // push, so it can't distinguish "never locked" from "not yet checked").
+  return NextResponse.json({ data: data.data, uploaded_at: data.uploaded_at, locked: data.locked });
 }
 
 export async function POST(request: NextRequest) {
