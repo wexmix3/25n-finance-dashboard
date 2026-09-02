@@ -92,7 +92,8 @@ export function GLVariancePanel({ flags, priorMonth, reviewApi, notesApi }: Prop
             {sorted.map((f) => {
               const unfav = isRevenueAccount(f.account) ? f.variance < 0 : f.variance > 0;
               const isOpen = expanded === f.account;
-              const hasDetail = (f.transactions?.length ?? 0) > 0;
+              const hasComparison = (f.detail_comparison?.length ?? 0) > 0;
+              const hasDetail = (f.transactions?.length ?? 0) > 0 || hasComparison;
               const approved = reviewApi.isApproved("variance", f.account);
               return (
                 <React.Fragment key={f.account}>
@@ -131,9 +132,49 @@ export function GLVariancePanel({ flags, priorMonth, reviewApi, notesApi }: Prop
                       )}
                     </td>
                   </tr>
-                  {isOpen && hasDetail && (
+                  {isOpen && hasComparison && (
+                    <tr key={`${f.account}-comparison`}>
+                      <td colSpan={9} className="px-4 pt-2 bg-gray-50">
+                        <p className="text-[10px] font-semibold text-gray-500 uppercase tracking-wide mb-1">
+                          What changed vs {f.prior_month ?? priorMonth} — by control #/vendor
+                        </p>
+                        <table className="w-full text-[11px]">
+                          <thead>
+                            <tr className="text-gray-400">
+                              <th className="text-left font-medium py-1 pr-3">Control #</th>
+                              <th className="text-left font-medium py-1 pr-3">Vendor / Description</th>
+                              <th className="text-right font-medium py-1 pr-3">Prior</th>
+                              <th className="text-right font-medium py-1 pr-3">Current</th>
+                              <th className="text-right font-medium py-1 pr-3">Change</th>
+                              <th className="text-left font-medium py-1">Status</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {f.detail_comparison!.map((d, i) => (
+                              <tr key={i} className="text-gray-600">
+                                <td className="py-1 pr-3 font-mono">{d.control || "—"}</td>
+                                <td className="py-1 pr-3 truncate max-w-[240px]">{d.person_description || "—"}</td>
+                                <td className="py-1 pr-3 text-right">{fmtK(d.prior_total)}</td>
+                                <td className="py-1 pr-3 text-right">{fmtK(d.current_total)}</td>
+                                <td className={`py-1 pr-3 text-right font-medium ${d.delta > 0 ? "text-red-600" : "text-emerald-600"}`}>
+                                  {d.delta > 0 ? "+" : ""}{fmtK(d.delta)}
+                                </td>
+                                <td className="py-1 text-gray-400">{d.status}</td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </td>
+                    </tr>
+                  )}
+                  {isOpen && hasDetail && (f.transactions?.length ?? 0) > 0 && (
                     <tr key={`${f.account}-detail`}>
-                      <td colSpan={9} className="px-4 py-2 bg-gray-50">
+                      <td colSpan={9} className={`px-4 py-2 bg-gray-50 ${hasComparison ? "pt-1" : ""}`}>
+                        {hasComparison && (
+                          <p className="text-[10px] font-semibold text-gray-500 uppercase tracking-wide mb-1">
+                            All {f.transactions!.length} transaction{f.transactions!.length !== 1 ? "s" : ""} this period
+                          </p>
+                        )}
                         <table className="w-full text-[11px]">
                           <thead>
                             <tr className="text-gray-400">

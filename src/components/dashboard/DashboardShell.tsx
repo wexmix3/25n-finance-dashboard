@@ -27,7 +27,7 @@ const HEALTH_LEGEND: { status: HealthStatus; dot: string; label: string }[] = [
  * Fortune-500 ops tool doesn't make you hover five times to learn a rule. */
 function HealthLegend() {
   return (
-    <div className="px-4 pt-3 pb-4 mt-auto border-t border-white/10 space-y-1.5">
+    <div className="px-4 pt-3 pb-4 border-b border-white/10 space-y-1.5">
       <p className="text-[10px] font-semibold text-white/40 uppercase tracking-wider mb-2">Net income vs budget</p>
       {HEALTH_LEGEND.map(({ status, dot, label }) => (
         <div key={status} className="flex items-center gap-2">
@@ -55,6 +55,7 @@ export function DashboardShell({ active, onChange, flagCounts, healthStatuses, c
 
   const navContent = (onNavigate: (loc: LocationTab) => void) => (
     <>
+      <HealthLegend />
       <nav className="flex-1 px-2 space-y-0.5 overflow-y-auto">
         <SidebarItem
           label="Consolidated"
@@ -73,7 +74,6 @@ export function DashboardShell({ active, onChange, flagCounts, healthStatuses, c
           />
         ))}
       </nav>
-      <HealthLegend />
     </>
   );
 

@@ -4,7 +4,7 @@ import { useSyncExternalStore } from "react";
 import type { Location, FinancialData, OccupancyData, TrendPoint, MonthlyPacket, LineItem, MonthlyRecord, IncomeStatement } from "@/types/dashboard";
 import { formatCurrency, formatSignedPct, MARGIN_REVENUE_FLOOR } from "@/lib/formatCurrency";
 import { fmtOccPct } from "@/lib/occupancy";
-import { ytdRecordsThrough } from "@/lib/months";
+import { ytdRecordsThrough, monthSortKey } from "@/lib/months";
 import {
   BarChart, Bar, Cell, XAxis, YAxis, CartesianGrid, Tooltip as RTooltip, ResponsiveContainer,
   PieChart, Pie, Cell as PieCell,
@@ -467,12 +467,12 @@ export function OverviewPacket({
         <SectionBand n={4} title="Revenue Mix (Period to Date)" />
         <SectionShell>
           <table className="w-full text-[13px]">
-            <thead><tr className="border-b border-gray-100"><th className="text-left font-semibold text-gray-400 text-[10.5px] uppercase px-4 sm:px-5 py-2">&nbsp;</th><th className="text-right font-semibold text-gray-400 text-[10.5px] uppercase px-4 sm:px-5 py-2">{currentData.month.split(" ")[0]} Actual</th><th className="text-right font-semibold text-gray-400 text-[10.5px] uppercase px-4 sm:px-5 py-2">% of Income</th>{ytdRevenueByLabel && <th className="text-right font-semibold text-gray-400 text-[10.5px] uppercase px-4 sm:px-5 py-2">YTD Actual</th>}</tr></thead>
+            <thead><tr className="border-b border-gray-100"><th className="text-left font-semibold text-gray-400 text-[10.5px] uppercase px-4 sm:px-5 py-2">&nbsp;</th><th className="text-right font-semibold text-gray-400 text-[10.5px] uppercase px-4 sm:px-5 py-2">{currentData.month.split(" ")[0]} Actual</th><th className="text-right font-semibold text-gray-400 text-[10.5px] uppercase px-4 sm:px-5 py-2">% of Income</th>{ytdRevenueByLabel && <th className="text-right font-semibold text-gray-400 text-[10.5px] uppercase px-4 sm:px-5 py-2">YTD Actual</th>}{ytdRevenueByLabel && <th className="text-right font-semibold text-gray-400 text-[10.5px] uppercase px-4 sm:px-5 py-2">YTD %</th>}</tr></thead>
             <tbody>
               {revenueLines.map(l => (
-                <Row key={l.label} label={l.label} value={fmt(l.value)} pctVal={totalIncome !== 0 ? pct((l.value / totalIncome) * 100) : "—"} extra={ytdRevenueByLabel ? fmt(ytdRevenueByLabel[l.label]) : undefined} />
+                <Row key={l.label} label={l.label} value={fmt(l.value)} pctVal={totalIncome !== 0 ? pct((l.value / totalIncome) * 100) : "—"} extra={ytdRevenueByLabel ? fmt(ytdRevenueByLabel[l.label]) : undefined} extra2={ytdRevenueByLabel && ytd && ytd.revenue !== 0 ? pct((ytdRevenueByLabel[l.label] / ytd.revenue) * 100) : undefined} />
               ))}
-              <Row label="Total Income" value={fmt(totalIncome)} pctVal="100.0%" extra={ytdRevenueByLabel ? fmt(ytd!.revenue) : undefined} bold last />
+              <Row label="Total Income" value={fmt(totalIncome)} pctVal="100.0%" extra={ytdRevenueByLabel ? fmt(ytd!.revenue) : undefined} extra2={ytdRevenueByLabel ? "100.0%" : undefined} bold last />
             </tbody>
           </table>
         </SectionShell>
@@ -483,12 +483,12 @@ export function OverviewPacket({
         <SectionBand n={5} title="Operating Expense Mix (Period to Date)" />
         <SectionShell>
           <table className="w-full text-[13px]">
-            <thead><tr className="border-b border-gray-100"><th className="text-left font-semibold text-gray-400 text-[10.5px] uppercase px-4 sm:px-5 py-2">&nbsp;</th><th className="text-right font-semibold text-gray-400 text-[10.5px] uppercase px-4 sm:px-5 py-2">{currentData.month.split(" ")[0]} Actual</th><th className="text-right font-semibold text-gray-400 text-[10.5px] uppercase px-4 sm:px-5 py-2">% of Expenses</th>{ytdOpexByLabel && <th className="text-right font-semibold text-gray-400 text-[10.5px] uppercase px-4 sm:px-5 py-2">YTD Actual</th>}</tr></thead>
+            <thead><tr className="border-b border-gray-100"><th className="text-left font-semibold text-gray-400 text-[10.5px] uppercase px-4 sm:px-5 py-2">&nbsp;</th><th className="text-right font-semibold text-gray-400 text-[10.5px] uppercase px-4 sm:px-5 py-2">{currentData.month.split(" ")[0]} Actual</th><th className="text-right font-semibold text-gray-400 text-[10.5px] uppercase px-4 sm:px-5 py-2">% of Expenses</th>{ytdOpexByLabel && <th className="text-right font-semibold text-gray-400 text-[10.5px] uppercase px-4 sm:px-5 py-2">YTD Actual</th>}{ytdOpexByLabel && <th className="text-right font-semibold text-gray-400 text-[10.5px] uppercase px-4 sm:px-5 py-2">YTD %</th>}</tr></thead>
             <tbody>
               {opexLines.map(l => (
-                <Row key={l.label} label={l.label} value={fmt(l.value)} pctVal={totalExpenses !== 0 ? pct((l.value / totalExpenses) * 100) : "—"} extra={ytdOpexByLabel ? fmt(ytdOpexByLabel[l.label]) : undefined} />
+                <Row key={l.label} label={l.label} value={fmt(l.value)} pctVal={totalExpenses !== 0 ? pct((l.value / totalExpenses) * 100) : "—"} extra={ytdOpexByLabel ? fmt(ytdOpexByLabel[l.label]) : undefined} extra2={ytdOpexByLabel && ytd && ytd.opex !== 0 ? pct((ytdOpexByLabel[l.label] / ytd.opex) * 100) : undefined} />
               ))}
-              <Row label="Total Operating Expenses" value={fmt(totalExpenses)} pctVal="100.0%" extra={ytdOpexByLabel ? fmt(ytd!.opex) : undefined} bold last />
+              <Row label="Total Operating Expenses" value={fmt(totalExpenses)} pctVal="100.0%" extra={ytdOpexByLabel ? fmt(ytd!.opex) : undefined} extra2={ytdOpexByLabel ? "100.0%" : undefined} bold last />
             </tbody>
           </table>
         </SectionShell>
@@ -504,7 +504,9 @@ export function OverviewPacket({
 /** Compact space-type-by-month table below the current-period donut --
  * shows every month that has mix data on file, not just the one selected. */
 function OccupancyMixHistory({ trend }: { trend: { month: string; mix: { label: string; value: number }[] }[] }) {
-  const populated = trend.filter(t => t.mix.length > 0);
+  // Chronological left-to-right (Jan -> Aug) per Christine's 2026-09-01 request --
+  // `trend` arrives newest-first from allOccupancy's descending Supabase sort.
+  const populated = trend.filter(t => t.mix.length > 0).sort((a, b) => monthSortKey(a.month) - monthSortKey(b.month));
   if (populated.length < 2) return null;
 
   const labels = Array.from(new Set(populated.flatMap(t => t.mix.map(m => m.label))));
@@ -602,13 +604,14 @@ function KpiTile({ label, value, sub, ytd, tone }: { label: string; value: strin
   );
 }
 
-function Row({ label, value, pctVal, extra, bold, last, positive }: { label: string; value: string; pctVal?: string; extra?: string; bold?: boolean; last?: boolean; positive?: boolean }) {
+function Row({ label, value, pctVal, extra, extra2, bold, last, positive }: { label: string; value: string; pctVal?: string; extra?: string; extra2?: string; bold?: boolean; last?: boolean; positive?: boolean }) {
   return (
     <tr className={last ? "border-t border-gray-200" : "border-b border-gray-50"}>
       <td className={`px-4 sm:px-5 py-2 ${bold ? "font-bold text-gray-900" : "text-gray-700"}`}>{label}</td>
       <td className={`text-right px-4 sm:px-5 py-2 tabular-nums ${bold ? "font-bold" : ""} ${positive ? "text-emerald-700" : value.startsWith("(") ? "text-red-600" : "text-gray-800"}`}>{value}</td>
       {pctVal !== undefined && <td className={`text-right px-4 sm:px-5 py-2 tabular-nums text-gray-500 ${bold ? "font-bold" : ""}`}>{pctVal}</td>}
       {extra !== undefined && <td className={`text-right px-4 sm:px-5 py-2 tabular-nums ${bold ? "font-bold text-gray-900" : "text-gray-700"}`}>{extra}</td>}
+      {extra2 !== undefined && <td className={`text-right px-4 sm:px-5 py-2 tabular-nums text-gray-500 ${bold ? "font-bold" : ""}`}>{extra2}</td>}
     </tr>
   );
 }

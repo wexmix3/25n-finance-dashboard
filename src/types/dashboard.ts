@@ -88,6 +88,21 @@ export interface VarianceFlag {
   rule_triggered: string;
   equity_account?: boolean;
   transactions?: { date: string; person_description: string; control: string; amount: number }[];
+  // Grouped (control#/vendor) prior-vs-current comparison -- Christine's
+  // 2026-09-01 ask: "run a detailed GL comparison and list out what the
+  // differences are" so the accountant doesn't have to check Voyager
+  // manually. Only groups that actually changed are included.
+  detail_comparison?: {
+    control: string;
+    person_description: string;
+    prior_total: number;
+    prior_count: number;
+    current_total: number;
+    current_count: number;
+    delta: number;
+    status: "new" | "dropped" | "changed";
+  }[];
+  prior_month?: string;
 }
 
 /** Per-item approve/keep-flagged status on GL Check's three flagged-item
