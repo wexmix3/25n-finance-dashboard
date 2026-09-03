@@ -5,11 +5,9 @@ import { createBrowserSupabaseClient } from "@/lib/supabase/browser";
 import { useRouter } from "next/navigation";
 
 export default function LoginPage() {
-  const [mode, setMode] = useState<"signin" | "signup">("signin");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
-  const [message, setMessage] = useState("");
   const [loading, setLoading] = useState(false);
   const router = useRouter();
 
@@ -17,25 +15,11 @@ export default function LoginPage() {
     e.preventDefault();
     setLoading(true);
     setError("");
-    setMessage("");
 
     const supabase = createBrowserSupabaseClient();
 
-    if (mode === "signup") {
-      const { data, error } = await supabase.auth.signUp({ email, password });
-      if (error) {
-        setError(error.message || error.name || `Sign up failed (${JSON.stringify(error)})`);
-      } else if (data.user && !data.session) {
-        setMessage("Check your email to confirm your account, then sign in.");
-        setMode("signin");
-      } else {
-        setMessage("Account created. You can now sign in.");
-        setMode("signin");
-      }
-      setLoading(false);
-      return;
-    }
-
+    // Sign-in only — self-serve sign-up removed 2026-09-02. Accounts are
+    // provisioned by Max via the Supabase Admin API.
     const { error } = await supabase.auth.signInWithPassword({ email, password });
     if (error) {
       setError(error.message || "Invalid email or password.");
@@ -87,40 +71,22 @@ export default function LoginPage() {
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 required
-                autoComplete={mode === "signup" ? "new-password" : "current-password"}
+                autoComplete="current-password"
                 className="w-full px-3.5 py-2.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#E07A3E]/40 focus:border-[#E07A3E] transition-colors duration-150"
               />
             </div>
 
             {error && <p className="text-sm text-red-600">{error}</p>}
-            {message && <p className="text-sm text-emerald-600">{message}</p>}
 
             <button
               type="submit"
               disabled={loading}
               className="w-full py-2.5 px-4 bg-[#E07A3E] text-white text-sm font-semibold rounded-full hover:bg-[#c5692f] disabled:opacity-50 disabled:cursor-not-allowed transition-colors duration-150"
             >
-              {loading
-                ? mode === "signup" ? "Creating account..." : "Signing in..."
-                : mode === "signup" ? "Create account" : "Sign in"}
+              {loading ? "Signing in..." : "Sign in"}
             </button>
           </form>
 
-          <p className="mt-5 text-center text-xs text-gray-400">
-            {mode === "signin" ? (
-              <>No account?{" "}
-                <button onClick={() => { setMode("signup"); setError(""); setMessage(""); }} className="text-gray-700 underline">
-                  Create one
-                </button>
-              </>
-            ) : (
-              <>Already have an account?{" "}
-                <button onClick={() => { setMode("signin"); setError(""); setMessage(""); }} className="text-gray-700 underline">
-                  Sign in
-                </button>
-              </>
-            )}
-          </p>
         </div>
       </div>
     </div>
